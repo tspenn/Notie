@@ -204,9 +204,9 @@ export function Notebook({
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <img
-          src="/notie-icon.jpg"
+          src="/notie-mark.png"
           alt=""
-          className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-border"
+          className="h-8 w-8 shrink-0 rounded-full bg-sand object-contain ring-1 ring-border"
         />
         {renaming ? (
           <Input

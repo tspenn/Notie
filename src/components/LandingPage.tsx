@@ -82,9 +82,9 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
       <header className="relative mx-auto flex max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
         <div className="flex items-center gap-3">
           <img
-            src="/notie-icon.jpg"
+            src="/notie-mark.png"
             alt="Notie"
-            className="h-11 w-11 rounded-full object-cover ring-1 ring-border shadow-sm"
+            className="h-11 w-11 rounded-full bg-sand object-contain ring-1 ring-border shadow-sm"
           />
           <span className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Notie

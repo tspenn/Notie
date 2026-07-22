@@ -52,7 +52,7 @@ function AppContent() {
     return (
       <div className="flex min-h-dvh items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <img src="/notie-icon.jpg" alt="Notie" className="h-16 w-16 rounded-full object-cover ring-1 ring-border" />
+          <img src="/notie-mark.png" alt="Notie" className="h-16 w-16 rounded-full bg-sand object-contain ring-1 ring-border" />
           <p className="font-display text-lg text-muted-foreground">Opening your shelf…</p>
         </div>
       </div>

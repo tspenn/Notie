@@ -66,9 +66,9 @@ export function ArchiveView({ userId, onBack }: ArchiveViewProps) {
                 className="flex items-center gap-3 rounded-lg border border-border bg-card/70 px-4 py-3 shadow-sm"
               >
                 <img
-                  src="/notie-icon.jpg"
+                  src="/notie-mark.png"
                   alt=""
-                  className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-border"
+                  className="h-9 w-9 shrink-0 rounded-full bg-sand object-contain ring-1 ring-border"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-display text-base font-semibold text-foreground">{nb.title}</p>

@@ -603,9 +603,9 @@ export function CategoriesPanel({
                 className="flex w-full items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-left text-sm hover:border-moss/50"
               >
                 <img
-                  src="/notie-icon.jpg"
+                  src="/notie-mark.png"
                   alt=""
-                  className="h-7 w-7 rounded-full object-cover ring-1 ring-border"
+                  className="h-7 w-7 rounded-full bg-sand object-contain ring-1 ring-border"
                 />
                 <span className="truncate font-medium">{nb.title}</span>
               </button>

@@ -19,16 +19,16 @@ export default defineConfig({
         theme_color: '#3d6b63',
         icons: [
           {
-            src: '/notie-icon.jpg',
-            sizes: '192x192',
-            type: 'image/jpeg',
+            src: '/notie-mark.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'any',
           },
           {
-            src: '/notie-icon.jpg',
+            src: '/notie-mark.png',
             sizes: '512x512',
-            type: 'image/jpeg',
-            purpose: 'any',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },
