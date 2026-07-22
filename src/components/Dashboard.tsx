@@ -27,9 +27,12 @@ export function Dashboard() {
   const [tab, setTab] = useState<MainTab>('library');
   const [openNotebookId, setOpenNotebookId] = useState<string | null>(null);
   const [openEntryId, setOpenEntryId] = useState<string | undefined>();
+  const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+
+  const bumpLibrary = () => setLibraryRefreshKey((k) => k + 1);
 
   useEffect(() => {
     const apply = () => {
@@ -126,6 +129,7 @@ export function Dashboard() {
           <TabsContent value="library">
             <Library
               userId={userId}
+              refreshKey={libraryRefreshKey}
               onOpenNotebook={(id) => {
                 setOpenNotebookId(id);
                 setOpenEntryId(undefined);
@@ -147,9 +151,11 @@ export function Dashboard() {
           userId={userId}
           notebookId={openNotebookId}
           initialEntryId={openEntryId}
+          onEntrySaved={bumpLibrary}
           onClose={() => {
             setOpenNotebookId(null);
             setOpenEntryId(undefined);
+            bumpLibrary();
             navigateTo(dashboardLink().replace(/^#/, ''));
           }}
         />

@@ -3,26 +3,36 @@ import {
   type Entry,
   type IcsFeedSettings,
   type NotebookMeta,
+  type NotebookShelfData,
   type NoteToSelf,
   type NotieStore,
   type PlanKey,
+  type ProgressRow,
   type SavedItem,
   type UserProfile,
+  getBarHeight,
+  pickBookColor,
 } from './types';
-import { uid } from './utils';
+import { stripHtml, uid } from './utils';
 
-const STORAGE_KEY = 'notie_local_db_v1';
+const STORAGE_KEY = 'notie_local_db_v2';
+const LEGACY_KEY = 'notie_local_db_v1';
 
 function icsSettingsKey(userId: string): string {
   return `notie_ics_feed:${userId}`;
 }
 
+function draftKey(userId: string, notebookId: string, entryId: string): string {
+  return `notie_entry_draft::${userId}::${notebookId}::${entryId}`;
+}
+
 function emptyStore(): NotieStore {
   return {
-    version: 1,
+    version: 2,
     profile: null,
     notebooks: [],
     entries: [],
+    progressRows: [],
     savedItems: [],
     events: [],
     notesToSelf: [],
@@ -30,13 +40,80 @@ function emptyStore(): NotieStore {
   };
 }
 
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function getLocalDateKey(input: string | Date): string {
+  const d = input instanceof Date ? input : new Date(input);
+  const y = d.getFullYear();
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function migrateV1(raw: unknown): NotieStore {
+  const old = raw as {
+    profile?: UserProfile | null;
+    notebooks?: Array<NotebookMeta & { inspiration?: string }>;
+    entries?: Entry[];
+    savedItems?: SavedItem[];
+    events?: CalendarEvent[];
+    notesToSelf?: NoteToSelf[];
+    customCategories?: NotieStore['customCategories'];
+  };
+  const store = emptyStore();
+  store.profile = old.profile ?? null;
+  store.notebooks = (old.notebooks ?? []).map((n) => ({
+    id: n.id,
+    userId: n.userId,
+    title: n.title,
+    colorIndex: n.colorIndex ?? 0,
+    isArchived: n.isArchived ?? false,
+    createdAt: n.createdAt,
+    updatedAt: n.updatedAt,
+  }));
+  store.entries = (old.entries ?? []).map((e) => ({
+    ...e,
+    inspiration: (e as Entry).inspiration ?? '',
+    writingMinutes: (e as Entry).writingMinutes ?? 0,
+  }));
+  store.savedItems = old.savedItems ?? [];
+  store.events = old.events ?? [];
+  store.notesToSelf = old.notesToSelf ?? [];
+  store.customCategories = old.customCategories ?? [];
+
+  // Seed progress rows from archived entries so existing libraries get bars.
+  for (const e of store.entries.filter((x) => x.isArchived)) {
+    store.progressRows.push({
+      id: uid('prog'),
+      userId: e.userId,
+      notebookId: e.notebookId,
+      title: e.title || 'Saved entry',
+      summary: stripHtml(e.content).slice(0, 280),
+      inspiration: e.inspiration || '',
+      investmentMinutes: Math.max(1, e.writingMinutes || 5),
+      entryId: e.id,
+      createdAt: e.updatedAt || e.createdAt,
+    });
+  }
+  return store;
+}
+
 function read(): NotieStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return emptyStore();
-    const parsed = JSON.parse(raw) as NotieStore;
-    if (parsed?.version !== 1) return emptyStore();
-    return parsed;
+    if (raw) {
+      const parsed = JSON.parse(raw) as NotieStore;
+      if (parsed?.version === 2) return parsed;
+    }
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      const migrated = migrateV1(JSON.parse(legacy));
+      write(migrated);
+      return migrated;
+    }
+    return emptyStore();
   } catch {
     return emptyStore();
   }
@@ -46,8 +123,11 @@ function write(store: NotieStore): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
+export interface EntryDraft {
+  content: string;
+  title: string;
+  inspiration: string;
+  savedAt: string;
 }
 
 export const localDb = {
@@ -90,7 +170,6 @@ export const localDb = {
   },
 
   signOutLocal(): void {
-    // Keep data; clear only the "session" flag used by AuthContext.
     localStorage.removeItem('notie_local_session');
   },
 
@@ -110,28 +189,49 @@ export const localDb = {
       .sort((a, b) => a.title.localeCompare(b.title));
   },
 
+  getNotebook(notebookId: string): NotebookMeta | null {
+    return read().notebooks.find((n) => n.id === notebookId) ?? null;
+  },
+
   createNotebook(userId: string, title: string): NotebookMeta {
     const store = read();
+    const name = title.trim() || 'Untitled notebook';
+    const now = nowIso();
     const notebook: NotebookMeta = {
       id: uid('nb'),
       userId,
-      title: title.trim() || 'Untitled notebook',
-      inspiration: '',
+      title: name,
       colorIndex: store.notebooks.length % 8,
       isArchived: false,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
+      createdAt: now,
+      updatedAt: now,
     };
     store.notebooks.push(notebook);
+
+    // First canvas ledger stub (0 minutes) — like NewProjectDialog.
+    store.progressRows.push({
+      id: uid('prog'),
+      userId,
+      notebookId: notebook.id,
+      title: name,
+      summary: 'First entry',
+      inspiration: '',
+      investmentMinutes: 0,
+      entryId: null,
+      createdAt: now,
+    });
+
     const entry: Entry = {
       id: uid('entry'),
       userId,
       notebookId: notebook.id,
       title: 'First entry',
       content: '<p></p>',
+      inspiration: '',
       isArchived: false,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
+      writingMinutes: 0,
+      createdAt: now,
+      updatedAt: now,
     };
     store.entries.push(entry);
     write(store);
@@ -140,7 +240,7 @@ export const localDb = {
 
   updateNotebook(
     notebookId: string,
-    patch: Partial<Pick<NotebookMeta, 'title' | 'inspiration' | 'isArchived' | 'colorIndex'>>,
+    patch: Partial<Pick<NotebookMeta, 'title' | 'isArchived' | 'colorIndex'>>,
   ): NotebookMeta | null {
     const store = read();
     const nb = store.notebooks.find((n) => n.id === notebookId);
@@ -154,28 +254,67 @@ export const localDb = {
     const store = read();
     store.notebooks = store.notebooks.filter((n) => n.id !== notebookId);
     store.entries = store.entries.filter((e) => e.notebookId !== notebookId);
+    store.progressRows = store.progressRows.filter((p) => p.notebookId !== notebookId);
     store.savedItems = store.savedItems.filter((s) => s.notebookId !== notebookId);
     store.customCategories = store.customCategories.filter((c) => c.notebookId !== notebookId);
     write(store);
   },
 
+  /** Shelf data for Library bars — Canvas buildProjectData equivalent. */
+  listShelf(userId: string): NotebookShelfData[] {
+    const store = read();
+    const today = getLocalDateKey(new Date());
+    return store.notebooks
+      .filter((n) => n.userId === userId && !n.isArchived)
+      .map((notebook) => {
+        const rows = store.progressRows.filter((p) => p.notebookId === notebook.id);
+        const totalMinutes = rows.reduce((sum, r) => sum + Math.max(0, r.investmentMinutes), 0);
+        const todayMinutes = rows
+          .filter((r) => getLocalDateKey(r.createdAt) === today)
+          .reduce((sum, r) => sum + Math.max(0, r.investmentMinutes), 0);
+        const open = store.entries
+          .filter((e) => e.notebookId === notebook.id && !e.isArchived)
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+        const previousEntry =
+          store.entries
+            .filter((e) => e.notebookId === notebook.id && e.isArchived)
+            .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+        const lastProgress = [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+        const inspiration = open?.inspiration || lastProgress?.inspiration || '';
+        const color = pickBookColor(notebook.title);
+        return {
+          notebook,
+          totalMinutes,
+          todayMinutes,
+          barHeight: getBarHeight(totalMinutes),
+          previousEntry,
+          inspiration,
+          openEntryId: open?.id ?? null,
+          color,
+        };
+      })
+      .sort((a, b) => a.notebook.title.localeCompare(b.notebook.title));
+  },
+
   getOpenEntry(notebookId: string): Entry | null {
-    const open = read().entries
-      .filter((e) => e.notebookId === notebookId && !e.isArchived)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    return open[0] ?? null;
+    return (
+      read()
+        .entries.filter((e) => e.notebookId === notebookId && !e.isArchived)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null
+    );
   },
 
   getPreviousEntry(notebookId: string, excludeId?: string): Entry | null {
-    const archived = read().entries
-      .filter(
-        (e) =>
-          e.notebookId === notebookId &&
-          e.isArchived &&
-          (!excludeId || e.id !== excludeId),
-      )
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    return archived[0] ?? null;
+    return (
+      read()
+        .entries.filter(
+          (e) =>
+            e.notebookId === notebookId &&
+            e.isArchived &&
+            (!excludeId || e.id !== excludeId),
+        )
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null
+    );
   },
 
   listEntries(notebookId: string): Entry[] {
@@ -184,29 +323,90 @@ export const localDb = {
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   },
 
-  ensureOpenEntry(userId: string, notebookId: string): Entry {
-    const existing = this.getOpenEntry(notebookId);
-    if (existing) return existing;
-    const store = read();
-    const previous = this.getPreviousEntry(notebookId);
-    const entry: Entry = {
-      id: uid('entry'),
-      userId,
-      notebookId,
-      title: previous ? `Continued from ${previous.title}` : 'New entry',
-      content: '<p></p>',
-      isArchived: false,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    };
-    store.entries.push(entry);
-    write(store);
-    return entry;
+  getEntry(entryId: string): Entry | null {
+    return read().entries.find((e) => e.id === entryId) ?? null;
   },
 
-  saveEntry(entryId: string, patch: Partial<Pick<Entry, 'title' | 'content'>>): Entry | null {
+  /**
+   * Canvas loadOrCreateSession: one open entry per notebook.
+   * Prefer local draft when newer/richer than stored open entry.
+   */
+  loadOrCreateOpenEntry(userId: string, notebookId: string): Entry {
     const store = read();
-    const entry = store.entries.find((e) => e.id === entryId);
+    let open = store.entries
+      .filter((e) => e.notebookId === notebookId && !e.isArchived)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+
+    if (!open) {
+      const previous = this.getPreviousEntry(notebookId);
+      const lastProgress = store.progressRows
+        .filter((p) => p.notebookId === notebookId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+      const now = nowIso();
+      open = {
+        id: uid('entry'),
+        userId,
+        notebookId,
+        title: previous ? `Continued from ${previous.title}` : 'New entry',
+        content: '<p></p>',
+        inspiration: previous?.inspiration || lastProgress?.inspiration || '',
+        isArchived: false,
+        writingMinutes: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      store.entries.push(open);
+      write(store);
+    }
+
+    const draft = this.readDraft(userId, notebookId, open.id);
+    if (draft && this.shouldPreferLocalDraft(draft, open)) {
+      return {
+        ...open,
+        content: draft.content,
+        title: draft.title || open.title,
+        inspiration: draft.inspiration ?? open.inspiration,
+      };
+    }
+    return open;
+  },
+
+  readDraft(userId: string, notebookId: string, entryId: string): EntryDraft | null {
+    try {
+      const raw = localStorage.getItem(draftKey(userId, notebookId, entryId));
+      if (!raw) return null;
+      return JSON.parse(raw) as EntryDraft;
+    } catch {
+      return null;
+    }
+  },
+
+  writeDraft(userId: string, notebookId: string, entryId: string, draft: Omit<EntryDraft, 'savedAt'>): void {
+    const payload: EntryDraft = { ...draft, savedAt: nowIso() };
+    localStorage.setItem(draftKey(userId, notebookId, entryId), JSON.stringify(payload));
+  },
+
+  clearDraft(userId: string, notebookId: string, entryId: string): void {
+    localStorage.removeItem(draftKey(userId, notebookId, entryId));
+  },
+
+  shouldPreferLocalDraft(draft: EntryDraft, server: Entry): boolean {
+    const draftText = stripHtml(draft.content);
+    const serverText = stripHtml(server.content);
+    if (!draftText && serverText) return false;
+    if (draft.savedAt > server.updatedAt) return true;
+    if (draftText.length > serverText.length + 20) return true;
+    if ((draft.title && !server.title) || (draft.inspiration && !server.inspiration)) return true;
+    return false;
+  },
+
+  /** Live draft persist — does NOT archive and does NOT advance Library progress. */
+  saveOpenEntryDraft(
+    entryId: string,
+    patch: Partial<Pick<Entry, 'title' | 'content' | 'inspiration' | 'writingMinutes'>>,
+  ): Entry | null {
+    const store = read();
+    const entry = store.entries.find((e) => e.id === entryId && !e.isArchived);
     if (!entry) return null;
     Object.assign(entry, patch, { updatedAt: nowIso() });
     const nb = store.notebooks.find((n) => n.id === entry.notebookId);
@@ -215,11 +415,112 @@ export const localDb = {
     return entry;
   },
 
-  closeEntry(entryId: string): Entry | null {
+  /** Live minute credits onto the latest progress stub (Canvas stub mechanism). */
+  creditLiveMinutes(notebookId: string, minutes: number): void {
+    if (minutes <= 0) return;
+    const store = read();
+    const stub = store.progressRows
+      .filter((p) => p.notebookId === notebookId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (stub) {
+      stub.investmentMinutes = Math.max(0, stub.investmentMinutes) + minutes;
+    }
+    const open = store.entries.find((e) => e.notebookId === notebookId && !e.isArchived);
+    if (open) open.writingMinutes = Math.max(0, open.writingMinutes) + minutes;
+    write(store);
+  },
+
+  setInspiration(notebookId: string, inspiration: string): void {
+    const store = read();
+    const open = store.entries.find((e) => e.notebookId === notebookId && !e.isArchived);
+    if (open) {
+      open.inspiration = inspiration;
+      open.updatedAt = nowIso();
+    }
+    const stub = store.progressRows
+      .filter((p) => p.notebookId === notebookId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (stub) stub.inspiration = inspiration;
+    write(store);
+  },
+
+  /**
+   * Save Entry (= Canvas Save Session).
+   * Archives the open entry, writes a progress ledger row (advances Library bar),
+   * opens a fresh entry carrying Inspiration forward.
+   */
+  saveEntry(entryId: string): { archived: Entry; nextOpen: Entry } | null {
+    const store = read();
+    const entry = store.entries.find((e) => e.id === entryId && !e.isArchived);
+    if (!entry) return null;
+
+    const minutes = Math.max(1, Math.round(entry.writingMinutes || 0));
+    // Remove provisional minutes from the stub that were credited live.
+    const stub = store.progressRows
+      .filter((p) => p.notebookId === entry.notebookId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (stub && stub.investmentMinutes >= entry.writingMinutes) {
+      stub.investmentMinutes = Math.max(0, stub.investmentMinutes - entry.writingMinutes);
+    }
+
+    entry.isArchived = true;
+    entry.updatedAt = nowIso();
+    if (!entry.title.trim()) {
+      entry.title = `Entry — ${new Date().toLocaleDateString()}`;
+    }
+
+    const progress: ProgressRow = {
+      id: uid('prog'),
+      userId: entry.userId,
+      notebookId: entry.notebookId,
+      title: entry.title,
+      summary: stripHtml(entry.content).slice(0, 400),
+      inspiration: entry.inspiration,
+      investmentMinutes: minutes,
+      entryId: entry.id,
+      createdAt: nowIso(),
+    };
+    store.progressRows.push(progress);
+
+    const nextOpen: Entry = {
+      id: uid('entry'),
+      userId: entry.userId,
+      notebookId: entry.notebookId,
+      title: '',
+      content: '<p></p>',
+      inspiration: entry.inspiration,
+      isArchived: false,
+      writingMinutes: 0,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    store.entries.push(nextOpen);
+
+    const nb = store.notebooks.find((n) => n.id === entry.notebookId);
+    if (nb) nb.updatedAt = nowIso();
+
+    write(store);
+    this.clearDraft(entry.userId, entry.notebookId, entry.id);
+    return { archived: entry, nextOpen };
+  },
+
+  /** Close panel without finishing — draft stays open. */
+  closeNotebookWithoutSaving(_entryId: string): void {
+    // Content already draft-saved; open entry remains open.
+  },
+
+  reopenEntry(entryId: string): Entry | null {
     const store = read();
     const entry = store.entries.find((e) => e.id === entryId);
     if (!entry) return null;
-    entry.isArchived = true;
+    // Enforce one open entry per notebook.
+    for (const e of store.entries) {
+      if (e.notebookId === entry.notebookId && !e.isArchived && e.id !== entryId) {
+        e.isArchived = true;
+        e.updatedAt = nowIso();
+      }
+    }
+    entry.isArchived = false;
     entry.updatedAt = nowIso();
     write(store);
     return entry;
@@ -329,11 +630,6 @@ export const localDb = {
     localStorage.setItem(icsSettingsKey(userId), JSON.stringify(settings));
   },
 
-  clearIcsSettings(userId: string): void {
-    localStorage.removeItem(icsSettingsKey(userId));
-  },
-
-  /** Replace all ICS-imported events for a user with a fresh sync set. */
   replaceIcsEvents(
     userId: string,
     incoming: Array<{
@@ -399,16 +695,14 @@ export const localDb = {
     if (!q) return { notebooks: [], entries: [], savedItems: [] };
     const store = read();
     const notebooks = store.notebooks.filter(
-      (n) =>
-        n.userId === userId &&
-        !n.isArchived &&
-        (n.title.toLowerCase().includes(q) || n.inspiration.toLowerCase().includes(q)),
+      (n) => n.userId === userId && !n.isArchived && n.title.toLowerCase().includes(q),
     );
     const notebookIds = new Set(store.notebooks.filter((n) => n.userId === userId).map((n) => n.id));
     const entries = store.entries.filter(
       (e) =>
         notebookIds.has(e.notebookId) &&
         (e.title.toLowerCase().includes(q) ||
+          e.inspiration.toLowerCase().includes(q) ||
           e.content.replace(/<[^>]+>/g, ' ').toLowerCase().includes(q)),
     );
     const savedItems = store.savedItems.filter(
