@@ -101,15 +101,19 @@ export function Dashboard() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-border/80 bg-sand/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex min-h-16 max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 md:min-h-[100px] md:gap-4 md:py-4">
           <img
             src="/notie-icon.jpg"
             alt=""
-            className="h-9 w-9 rounded-full object-cover ring-1 ring-border"
+            className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-border md:h-16 md:w-16 lg:h-[72px] lg:w-[72px]"
           />
           <div className="min-w-0 flex-1">
-            <p className="font-display text-lg font-semibold leading-none text-foreground">Notie</p>
-            <p className="truncate text-xs text-muted-foreground">{displayName}</p>
+            <p className="font-display text-xl font-semibold leading-none text-foreground md:text-3xl">
+              Notie
+            </p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground md:mt-1 md:text-sm">
+              {displayName}
+            </p>
           </div>
           <Button
             variant="ghost"
