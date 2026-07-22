@@ -1,4 +1,7 @@
-export type PlanKey = 'one_device' | 'cloud_sync';
+/** trial = free online try (30 days). one_device = Download. cloud_sync = Sync. */
+export type PlanKey = 'trial' | 'one_device' | 'cloud_sync';
+
+export const TRIAL_DAYS = 30;
 
 export type CategoryKey =
   | 'Files'
@@ -102,6 +105,8 @@ export interface UserProfile {
   email: string;
   displayName: string;
   plan: PlanKey;
+  /** ISO timestamp when the free online trial started (local). */
+  trialStartedAt: string | null;
   welcomeCompletedAt: string | null;
   createdAt: string;
 }
@@ -150,18 +155,26 @@ export const DEFAULT_CATEGORIES: CategoryKey[] = [
 
 export const CHECKABLE_CATEGORIES = new Set(['Lists', 'To Do']);
 
+/**
+ * Exact copy of Friday Canvas CorporateCanvas.getRegularProjectHeight.
+ * Do not “improve” — that sqrt curve was tuned over a long time.
+ * 1m→55px, 29m→86px, 90m→114px, 235m→155px
+ */
 export function getBarHeight(totalMinutes: number): number {
-  // Canvas CorporateCanvas curve: fast early growth, compresses at the top.
   const base = 48;
   const max = 160;
-  return Math.min(max, Math.round(base + Math.sqrt(Math.max(0, totalMinutes)) * 7));
+  const credits = Math.max(0, totalMinutes);
+  return Math.min(max, base + Math.sqrt(credits) * 7);
 }
 
+/** Exact copy of Friday Canvas CorporateCanvas.formatBarMinutes. */
 export function formatBarMinutes(mins: number): string {
-  if (mins < 60) return `${Math.round(mins)}m`;
-  const h = Math.floor(mins / 60);
-  const m = Math.round(mins % 60);
-  return m ? `${h}h ${m}m` : `${h}h`;
+  const total = Math.max(0, Math.round(mins));
+  if (total === 0) return '';
+  if (total < 60) return `${total}m`;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 export function pickBookColor(name: string) {

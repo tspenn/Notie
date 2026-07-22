@@ -10,6 +10,7 @@ import {
   type ProgressRow,
   type SavedItem,
   type UserProfile,
+  TRIAL_DAYS,
   getBarHeight,
   pickBookColor,
 } from './types';
@@ -50,6 +51,13 @@ function getLocalDateKey(input: string | Date): string {
   const m = `${d.getMonth() + 1}`.padStart(2, '0');
   const day = `${d.getDate()}`.padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/** Exact copy of Friday Canvas CorporateCanvas.normalizedMinutes. */
+function normalizedMinutes(value: number | null | undefined): number {
+  const mins = Number(value || 0);
+  if (!Number.isFinite(mins)) return 0;
+  return Math.max(0, Math.round(mins));
 }
 
 function migrateV1(raw: unknown): NotieStore {
@@ -139,16 +147,29 @@ export const localDb = {
     return read().profile;
   },
 
-  ensureLocalProfile(plan: PlanKey = 'one_device'): UserProfile {
+  ensureLocalProfile(plan: PlanKey = 'trial'): UserProfile {
     const store = read();
-    if (store.profile) return store.profile;
+    if (store.profile) {
+      // Migrate older profiles that predate trialStartedAt.
+      if (store.profile.trialStartedAt === undefined) {
+        store.profile.trialStartedAt =
+          store.profile.plan === 'trial' || !store.profile.plan
+            ? store.profile.createdAt
+            : null;
+        if (!store.profile.plan) store.profile.plan = 'trial';
+        write(store);
+      }
+      return store.profile;
+    }
+    const now = nowIso();
     const profile: UserProfile = {
       id: uid('user'),
       email: 'local@notie.app',
       displayName: 'Writer',
       plan,
+      trialStartedAt: plan === 'trial' ? now : null,
       welcomeCompletedAt: null,
-      createdAt: nowIso(),
+      createdAt: now,
     };
     store.profile = profile;
     write(store);
@@ -159,6 +180,9 @@ export const localDb = {
     const store = read();
     if (!store.profile) return;
     store.profile.plan = plan;
+    if (plan === 'trial' && !store.profile.trialStartedAt) {
+      store.profile.trialStartedAt = nowIso();
+    }
     write(store);
   },
 
@@ -173,14 +197,43 @@ export const localDb = {
     localStorage.removeItem('notie_local_session');
   },
 
-  startLocalSession(): UserProfile {
-    const profile = this.ensureLocalProfile();
+  /** Free online try — no download, 30 days, then choose Download or Sync. */
+  startTrialSession(): UserProfile {
+    const store = read();
+    let profile = store.profile;
+    if (!profile) {
+      profile = this.ensureLocalProfile('trial');
+    } else if (profile.plan !== 'one_device' && profile.plan !== 'cloud_sync') {
+      profile.plan = 'trial';
+      if (!profile.trialStartedAt) profile.trialStartedAt = nowIso();
+      write(store);
+    }
     localStorage.setItem('notie_local_session', profile.id);
-    return profile;
+    return this.getProfile()!;
+  },
+
+  startLocalSession(): UserProfile {
+    return this.startTrialSession();
   },
 
   hasLocalSession(): boolean {
     return Boolean(localStorage.getItem('notie_local_session'));
+  },
+
+  /** Whole days remaining in the free trial (0 when expired). Paid plans → null. */
+  getTrialDaysRemaining(): number | null {
+    const profile = this.getProfile();
+    if (!profile || profile.plan !== 'trial' || !profile.trialStartedAt) return null;
+    const start = new Date(profile.trialStartedAt).getTime();
+    if (!Number.isFinite(start)) return 0;
+    const elapsedMs = Date.now() - start;
+    const remaining = TRIAL_DAYS - Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
+    return Math.max(0, remaining);
+  },
+
+  isTrialExpired(): boolean {
+    const days = this.getTrialDaysRemaining();
+    return days !== null && days <= 0;
   },
 
   listNotebooks(userId: string, includeArchived = false): NotebookMeta[] {
@@ -268,10 +321,10 @@ export const localDb = {
       .filter((n) => n.userId === userId && !n.isArchived)
       .map((notebook) => {
         const rows = store.progressRows.filter((p) => p.notebookId === notebook.id);
-        const totalMinutes = rows.reduce((sum, r) => sum + Math.max(0, r.investmentMinutes), 0);
+        const totalMinutes = rows.reduce((sum, r) => sum + normalizedMinutes(r.investmentMinutes), 0);
         const todayMinutes = rows
           .filter((r) => getLocalDateKey(r.createdAt) === today)
-          .reduce((sum, r) => sum + Math.max(0, r.investmentMinutes), 0);
+          .reduce((sum, r) => sum + normalizedMinutes(r.investmentMinutes), 0);
         const open = store.entries
           .filter((e) => e.notebookId === notebook.id && !e.isArchived)
           .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
