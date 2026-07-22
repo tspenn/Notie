@@ -23,6 +23,8 @@ interface RichEditorProps {
   className?: string;
   /** Renders on the right of the formatting toolbar (Inspiration + lamp). */
   toolbarTrailing?: ReactNode;
+  /** Fired after mouse/touch selection ends with meaningful text. */
+  onTextSelected?: (text: string) => void;
 }
 
 function normalize(content: string): string {
@@ -42,11 +44,14 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
       placeholder = 'Begin writing…',
       className,
       toolbarTrailing,
+      onTextSelected,
     },
     ref,
   ) => {
     const lastHtmlRef = useRef('');
     const isExternalUpdateRef = useRef(false);
+    const onTextSelectedRef = useRef(onTextSelected);
+    onTextSelectedRef.current = onTextSelected;
 
     const editor = useEditor({
       extensions: [
@@ -87,6 +92,26 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
 
     useEffect(() => {
       editor?.setEditable(editable);
+    }, [editor, editable]);
+
+    useEffect(() => {
+      if (!editor || !editable) return;
+      const el = editor.view.dom;
+
+      const emitSelection = () => {
+        const { from, to, empty } = editor.state.selection;
+        if (empty || from === to) return;
+        const text = editor.state.doc.textBetween(from, to, '\n').trim();
+        if (!text || !/[\p{L}\p{N}]/u.test(text)) return;
+        onTextSelectedRef.current?.(text);
+      };
+
+      el.addEventListener('mouseup', emitSelection);
+      el.addEventListener('touchend', emitSelection);
+      return () => {
+        el.removeEventListener('mouseup', emitSelection);
+        el.removeEventListener('touchend', emitSelection);
+      };
     }, [editor, editable]);
 
     useImperativeHandle(

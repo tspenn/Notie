@@ -14,13 +14,20 @@ interface CategoriesPanelProps {
   userId: string;
   notebookId: string;
   entryId: string | null;
+  /** Bump when items are saved from outside (e.g. selection dialog). */
+  refreshKey?: number;
 }
 
 /**
  * Categories: Files, Gallery, Plans, Lists, To Do, plus any custom categories
  * the writer adds. Backed entirely by localDb.savedItems for this notebook.
  */
-export function CategoriesPanel({ userId, notebookId, entryId }: CategoriesPanelProps) {
+export function CategoriesPanel({
+  userId,
+  notebookId,
+  entryId,
+  refreshKey = 0,
+}: CategoriesPanelProps) {
   const [items, setItems] = useState<SavedItem[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const [active, setActive] = useState<CategoryKey>('Files');
@@ -36,7 +43,7 @@ export function CategoriesPanel({ userId, notebookId, entryId }: CategoriesPanel
   useEffect(() => {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notebookId]);
+  }, [notebookId, refreshKey]);
 
   const categories: CategoryKey[] = [...DEFAULT_CATEGORIES, ...customCategories];
 

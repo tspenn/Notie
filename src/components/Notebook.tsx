@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { RichEditor } from '@/components/RichEditor';
 import { CategoriesPanel } from '@/components/CategoriesPanel';
 import { ReadingLamp } from '@/components/ReadingLamp';
+import { SelectionActionDialog } from '@/components/SelectionActionDialog';
 
 interface NotebookProps {
   userId: string;
@@ -49,6 +50,9 @@ export function Notebook({
   const [titleDraft, setTitleDraft] = useState('');
   const [savingEntry, setSavingEntry] = useState(false);
   const [draftHint, setDraftHint] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [selectedText, setSelectedText] = useState('');
+  const [selectionOpen, setSelectionOpen] = useState(false);
+  const [categoriesRefreshKey, setCategoriesRefreshKey] = useState(0);
 
   const saveTimer = useRef<number | null>(null);
   const entryRef = useRef<Entry | null>(null);
@@ -266,6 +270,10 @@ export function Notebook({
             <RichEditor
               content={entry.content}
               onChange={(html) => scheduleDraft({ content: html })}
+              onTextSelected={(text) => {
+                setSelectedText(text);
+                setSelectionOpen(true);
+              }}
               toolbarTrailing={
                 <div className="flex min-w-[11rem] max-w-[16rem] items-center gap-2">
                   <ReadingLamp size={22} alt="" />
@@ -319,7 +327,12 @@ export function Notebook({
 
           <div className="flex-1 overflow-hidden rounded-lg border border-border bg-card/50 p-3">
             {sidebarTab === 'categories' ? (
-              <CategoriesPanel userId={userId} notebookId={notebookId} entryId={entry.id} />
+              <CategoriesPanel
+                userId={userId}
+                notebookId={notebookId}
+                entryId={entry.id}
+                refreshKey={categoriesRefreshKey}
+              />
             ) : (
               <ScrollArea className="h-full max-h-[55vh]">
                 <div className="space-y-1.5">
@@ -354,6 +367,19 @@ export function Notebook({
           </div>
         </div>
       </div>
+
+      <SelectionActionDialog
+        open={selectionOpen}
+        selectedText={selectedText}
+        userId={userId}
+        notebookId={notebookId}
+        entryId={entry.id}
+        onOpenChange={setSelectionOpen}
+        onSaved={() => {
+          setCategoriesRefreshKey((k) => k + 1);
+          setSidebarTab('categories');
+        }}
+      />
 
       <Dialog open={!!viewingEntry} onOpenChange={(open) => !open && setViewingEntry(null)}>
         <DialogContent className="max-h-[80vh] max-w-2xl overflow-hidden">
