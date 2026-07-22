@@ -108,7 +108,7 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
               Notie
             </h1>
             <p className="mt-5 max-w-md font-body text-lg leading-relaxed text-muted-foreground sm:text-xl">
-              A quiet place for the writing that takes time.
+              Not just for notes!
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button size="lg" onClick={() => startLocal()} disabled={busy}>
@@ -124,7 +124,8 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
               </Button>
             </div>
             <p className="mt-4 text-sm text-muted-foreground">
-              Journaling, essays, Bible study, novels — long-form first.
+              All your writing in the same place. Notes, Lists, Ideas, Plans, Study
+              Notes, Research, Novels. Organized. Sorted. Sharable.
             </p>
           </div>
 
