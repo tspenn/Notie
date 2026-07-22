@@ -3,7 +3,8 @@
  *
  * Routes (all prefixed with #):
  *   /dashboard
- *   /notebook/[id]/notebook
+ *   /notebook/[id]                 → Entry List
+ *   /notebook/[id]/notebook       → Notebook (writing space)
  *   /notebook/[id]/entry/[entryId]
  *   /calendar
  *   /search
@@ -13,6 +14,7 @@
 
 export type DeepLinkRoute =
   | { type: 'dashboard' }
+  | { type: 'entries'; notebookId: string }
   | { type: 'notebook'; notebookId: string }
   | { type: 'entry'; notebookId: string; entryId: string }
   | { type: 'calendar' }
@@ -34,8 +36,11 @@ export function parseDeepLink(hash?: string): DeepLinkRoute {
     if (parts[2] === 'entry' && parts[3]) {
       return { type: 'entry', notebookId, entryId: decodeURIComponent(parts[3]) };
     }
-    if (parts[2] === 'notebook' || !parts[2]) {
+    if (parts[2] === 'notebook') {
       return { type: 'notebook', notebookId };
+    }
+    if (!parts[2]) {
+      return { type: 'entries', notebookId };
     }
   }
 
@@ -51,6 +56,10 @@ export function navigateTo(path: string): void {
 
 export function dashboardLink(): string {
   return '#/dashboard';
+}
+
+export function entriesLink(notebookId: string): string {
+  return `#/notebook/${encodeURIComponent(notebookId)}`;
 }
 
 export function notebookLink(notebookId: string): string {

@@ -41,15 +41,30 @@ const SECTIONS: Section[] = [
     steps: [
       {
         heading: 'Your shelf of notebooks',
-        body: 'Each column is a notebook that looks like a book on a shelf. Tap a book to open its Notebook and keep writing.',
-      },
-      {
-        heading: 'Inspiration',
-        body: 'On large screens, the reading lamp and Inspiration field sit to the right of the book title. Inspiration is your short note — you write it; it is never AI-generated.',
+        body: 'Each column is a notebook that looks like a book on a shelf. Books grow as writing time. Tap a book to open its Entry List.',
       },
       {
         heading: 'Previous entry',
-        body: 'Above each notebook you will see “Previous entry: [title] — [date]” so you can pick up the thread of your last writing block.',
+        body: 'Above each book you may see “Previous entry: [title] — [date]” so you can see the last finished writing block at a glance.',
+      },
+    ],
+  },
+  {
+    id: 'entries',
+    title: 'Entry List',
+    icon: <BookOpen className="h-4 w-4" />,
+    steps: [
+      {
+        heading: 'Saved entries',
+        body: 'After you open a book, you see past Entries — each with a title, date, and a short summary (~150 characters). Tap an Entry to open it in the Notebook.',
+      },
+      {
+        heading: 'Inspiration',
+        body: 'On the Entry List, the reading lamp and Inspiration field sit to the right. Inspiration is your short note — you write it; it is never AI-generated.',
+      },
+      {
+        heading: 'Open notebook',
+        body: 'Use Open notebook to enter the current writing space and keep drafting. Save Entry when a block of writing is finished.',
       },
     ],
   },
@@ -64,7 +79,7 @@ const SECTIONS: Section[] = [
       },
       {
         heading: 'Entries (not sessions)',
-        body: 'Each open writing block is an Entry. Close an entry to archive it into history, then start a fresh one when you sit down again.',
+        body: 'Draft while you write. Save Entry when finished — that moves it into history and grows the book on the Library shelf.',
       },
       {
         heading: 'Categories',
@@ -79,7 +94,7 @@ const SECTIONS: Section[] = [
     steps: [
       {
         heading: 'Inspiration field',
-        body: 'A short, editable note on the Library shelf — a theme, verse, or line you want nearby while you write.',
+        body: 'A short, editable note on the Entry List (and in the Notebook toolbar) — a theme, verse, or line you want nearby while you write.',
       },
       {
         heading: 'Global search',

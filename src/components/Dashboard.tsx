@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import {
   calendarLink,
   dashboardLink,
+  entriesLink,
   navigateTo,
   notebookLink,
   parseDeepLink,
@@ -13,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Library } from '@/components/Library';
+import { EntryList } from '@/components/EntryList';
 import { CalendarView } from '@/components/CalendarView';
 import { NoteToSelf } from '@/components/NoteToSelf';
 import { Notebook } from '@/components/Notebook';
@@ -25,6 +27,7 @@ type MainTab = 'library' | 'calendar' | 'notes';
 export function Dashboard() {
   const { userId, displayName } = useAuth();
   const [tab, setTab] = useState<MainTab>('library');
+  const [entryListId, setEntryListId] = useState<string | null>(null);
   const [openNotebookId, setOpenNotebookId] = useState<string | null>(null);
   const [openEntryId, setOpenEntryId] = useState<string | undefined>();
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
@@ -34,21 +37,58 @@ export function Dashboard() {
 
   const bumpLibrary = () => setLibraryRefreshKey((k) => k + 1);
 
+  const openEntryList = (id: string) => {
+    setEntryListId(id);
+    setOpenNotebookId(null);
+    setOpenEntryId(undefined);
+    setTab('library');
+    navigateTo(entriesLink(id).replace(/^#/, ''));
+  };
+
+  const openWritingSpace = (notebookId: string, entryId?: string) => {
+    setEntryListId(notebookId);
+    setOpenNotebookId(notebookId);
+    setOpenEntryId(entryId);
+    navigateTo(
+      entryId
+        ? `#/notebook/${encodeURIComponent(notebookId)}/entry/${encodeURIComponent(entryId)}`.replace(
+            /^#/,
+            '',
+          )
+        : notebookLink(notebookId).replace(/^#/, ''),
+    );
+  };
+
   useEffect(() => {
     const apply = () => {
       const route = parseDeepLink();
-      if (route.type === 'calendar') setTab('calendar');
-      else if (route.type === 'search') {
+      if (route.type === 'calendar') {
+        setTab('calendar');
+        setEntryListId(null);
+        setOpenNotebookId(null);
+      } else if (route.type === 'search') {
         setSearchOpen(true);
         setTab('library');
+      } else if (route.type === 'entries') {
+        setTab('library');
+        setEntryListId(route.notebookId);
+        setOpenNotebookId(null);
+        setOpenEntryId(undefined);
       } else if (route.type === 'notebook') {
+        setTab('library');
+        setEntryListId(route.notebookId);
         setOpenNotebookId(route.notebookId);
         setOpenEntryId(undefined);
       } else if (route.type === 'entry') {
+        setTab('library');
+        setEntryListId(route.notebookId);
         setOpenNotebookId(route.notebookId);
         setOpenEntryId(route.entryId);
       } else {
         setTab('library');
+        setEntryListId(null);
+        setOpenNotebookId(null);
+        setOpenEntryId(undefined);
       }
     };
     apply();
@@ -107,6 +147,9 @@ export function Dashboard() {
           onValueChange={(v) => {
             const next = v as MainTab;
             setTab(next);
+            setEntryListId(null);
+            setOpenNotebookId(null);
+            setOpenEntryId(undefined);
             if (next === 'calendar') navigateTo(calendarLink().replace(/^#/, ''));
             else navigateTo(dashboardLink().replace(/^#/, ''));
           }}
@@ -127,15 +170,25 @@ export function Dashboard() {
           </TabsList>
 
           <TabsContent value="library">
-            <Library
-              userId={userId}
-              refreshKey={libraryRefreshKey}
-              onOpenNotebook={(id) => {
-                setOpenNotebookId(id);
-                setOpenEntryId(undefined);
-                navigateTo(notebookLink(id).replace(/^#/, ''));
-              }}
-            />
+            {entryListId ? (
+              <EntryList
+                userId={userId}
+                notebookId={entryListId}
+                refreshKey={libraryRefreshKey}
+                onBack={() => {
+                  setEntryListId(null);
+                  navigateTo(dashboardLink().replace(/^#/, ''));
+                }}
+                onOpenNotebook={() => openWritingSpace(entryListId)}
+                onOpenEntry={(entryId) => openWritingSpace(entryListId, entryId)}
+              />
+            ) : (
+              <Library
+                userId={userId}
+                refreshKey={libraryRefreshKey}
+                onOpenBook={openEntryList}
+              />
+            )}
           </TabsContent>
           <TabsContent value="calendar">
             <CalendarView userId={userId} />
@@ -153,10 +206,12 @@ export function Dashboard() {
           initialEntryId={openEntryId}
           onEntrySaved={bumpLibrary}
           onClose={() => {
+            const listId = openNotebookId;
             setOpenNotebookId(null);
             setOpenEntryId(undefined);
             bumpLibrary();
-            navigateTo(dashboardLink().replace(/^#/, ''));
+            setEntryListId(listId);
+            navigateTo(entriesLink(listId).replace(/^#/, ''));
           }}
         />
       )}
@@ -167,14 +222,11 @@ export function Dashboard() {
         onOpenChange={setSearchOpen}
         onOpenNotebook={(id) => {
           setSearchOpen(false);
-          setOpenNotebookId(id);
-          setOpenEntryId(undefined);
-          navigateTo(notebookLink(id).replace(/^#/, ''));
+          openEntryList(id);
         }}
         onOpenEntry={(notebookId, entryId) => {
           setSearchOpen(false);
-          setOpenNotebookId(notebookId);
-          setOpenEntryId(entryId);
+          openWritingSpace(notebookId, entryId);
         }}
       />
 
