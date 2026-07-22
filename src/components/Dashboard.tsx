@@ -101,11 +101,11 @@ export function Dashboard() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-border/80 bg-sand/85 backdrop-blur-md">
-        <div className="mx-auto flex min-h-16 max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 md:min-h-[100px] md:gap-4 md:py-4">
+        <div className="mx-auto flex min-h-16 max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 md:min-h-[125px] md:gap-4 md:py-5">
           <img
             src="/notie-mark.png"
             alt=""
-            className="h-11 w-11 shrink-0 rounded-full bg-sand object-contain ring-1 ring-border md:h-16 md:w-16 lg:h-[72px] lg:w-[72px]"
+            className="h-11 w-11 shrink-0 rounded-full bg-sand object-contain ring-1 ring-border md:h-[4.5rem] md:w-[4.5rem] lg:h-20 lg:w-20"
           />
           <div className="min-w-0 flex-1">
             <p className="font-display text-xl font-semibold leading-none text-foreground md:text-3xl">
@@ -113,6 +113,9 @@ export function Dashboard() {
             </p>
             <p className="mt-0.5 truncate text-xs text-muted-foreground md:mt-1 md:text-sm">
               {displayName}
+            </p>
+            <p className="mt-0.5 text-[10px] tracking-wide text-muted-foreground/80 md:mt-1 md:text-xs">
+              A Skyland Apps product
             </p>
           </div>
           <Button
