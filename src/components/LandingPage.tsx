@@ -96,7 +96,7 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
           <img
             src="/notie-mark.png"
             alt="Notie"
-            className="h-11 w-11 rounded-full bg-sand object-contain ring-1 ring-border shadow-sm"
+            className="h-11 w-9 rounded-lg bg-sand object-contain ring-1 ring-border shadow-sm"
           />
           <span className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             Notie

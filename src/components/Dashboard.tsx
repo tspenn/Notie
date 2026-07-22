@@ -105,7 +105,7 @@ export function Dashboard() {
           <img
             src="/notie-mark.png"
             alt=""
-            className="h-11 w-11 shrink-0 rounded-full bg-sand object-contain ring-1 ring-border md:h-[4.5rem] md:w-[4.5rem] lg:h-20 lg:w-20"
+            className="h-11 w-9 shrink-0 rounded-lg bg-sand object-contain ring-1 ring-border md:h-[4.5rem] md:w-14 lg:h-20 lg:w-16"
           />
           <div className="min-w-0 flex-1">
             <p className="font-display text-xl font-semibold leading-none text-foreground md:text-3xl">

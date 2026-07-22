@@ -605,7 +605,7 @@ export function CategoriesPanel({
                 <img
                   src="/notie-mark.png"
                   alt=""
-                  className="h-7 w-7 rounded-full bg-sand object-contain ring-1 ring-border"
+                  className="h-7 w-6 rounded-md bg-sand object-contain ring-1 ring-border"
                 />
                 <span className="truncate font-medium">{nb.title}</span>
               </button>

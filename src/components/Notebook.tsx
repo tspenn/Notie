@@ -206,7 +206,7 @@ export function Notebook({
         <img
           src="/notie-mark.png"
           alt=""
-          className="h-8 w-8 shrink-0 rounded-full bg-sand object-contain ring-1 ring-border"
+          className="h-8 w-7 shrink-0 rounded-md bg-sand object-contain ring-1 ring-border"
         />
         {renaming ? (
           <Input

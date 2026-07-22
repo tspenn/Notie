@@ -68,7 +68,7 @@ export function ArchiveView({ userId, onBack }: ArchiveViewProps) {
                 <img
                   src="/notie-mark.png"
                   alt=""
-                  className="h-9 w-9 shrink-0 rounded-full bg-sand object-contain ring-1 ring-border"
+                  className="h-9 w-7 shrink-0 rounded-md bg-sand object-contain ring-1 ring-border"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-display text-base font-semibold text-foreground">{nb.title}</p>

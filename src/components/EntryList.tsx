@@ -70,7 +70,7 @@ export function EntryList({
         <img
           src="/notie-mark.png"
           alt=""
-          className="h-9 w-9 shrink-0 rounded-full bg-sand object-contain ring-1 ring-border"
+          className="h-9 w-7 shrink-0 rounded-md bg-sand object-contain ring-1 ring-border"
         />
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-display text-2xl font-semibold text-foreground">
