@@ -79,6 +79,18 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
     <div className="relative min-h-dvh overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(61,107,99,0.12),_transparent_55%)]" />
 
+      {/* Top of landing — free online trial */}
+      <div className="relative border-b border-moss/20 bg-moss/10">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-1 px-5 py-3 text-center sm:flex-row sm:justify-between sm:px-8 sm:text-left">
+          <p className="font-display text-sm font-medium text-foreground sm:text-base">
+            Try Notie free for 30 days — online, no download.
+          </p>
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            Then choose Download or Sync.
+          </p>
+        </div>
+      </div>
+
       <header className="relative mx-auto flex max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
         <div className="flex items-center gap-3">
           <img
@@ -112,17 +124,23 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button size="lg" onClick={() => startLocal()} disabled={busy}>
-                Try on this device
+                Try free for 30 days
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 disabled={busy}
-                onClick={() => beginCheckout('cloud_sync', syncCycle)}
+                onClick={() => {
+                  document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+                }}
               >
-                Sync
+                See plans
               </Button>
             </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Free online trial on one device. No download required. After 30 days, pick Download
+              ($9.99) or Sync.
+            </p>
             <p className="mt-4 text-sm text-muted-foreground">
               All your writing in the same place. Notes, Lists, Ideas, Plans, Study
               Notes, Research, Novels. Organized. Sorted. Sharable.
@@ -141,10 +159,11 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
 
         <section id="pricing" className="mt-20 scroll-mt-8">
           <h2 className="font-display text-2xl font-semibold text-foreground sm:text-3xl">
-            Two honest plans
+            After your free trial
           </h2>
           <p className="mt-2 max-w-lg text-muted-foreground">
-            Download once for a single device, or Sync across all of yours.
+            Try online for 30 days — then choose Download for one device, or Sync across all of
+            yours.
           </p>
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
@@ -170,7 +189,7 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
                 className="mt-3 w-full text-center text-xs text-muted-foreground underline-offset-2 hover:underline"
                 onClick={() => startLocal()}
               >
-                or try free on this device first
+                or start your free 30-day trial
               </button>
             </article>
 
