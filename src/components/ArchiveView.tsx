@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Archive as ArchiveIcon, RotateCcw, Trash2 } from 'lucide-react';
 
 import { localDb } from '@/lib/localDb';
-import { BOOK_COLORS, type NotebookMeta } from '@/lib/types';
+import type { NotebookMeta } from '@/lib/types';
 import { formatShortDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -60,15 +60,15 @@ export function ArchiveView({ userId, onBack }: ArchiveViewProps) {
           </div>
         ) : (
           notebooks.map((nb) => {
-            const color = BOOK_COLORS[nb.colorIndex % BOOK_COLORS.length];
             return (
               <div
                 key={nb.id}
                 className="flex items-center gap-3 rounded-lg border border-border bg-card/70 px-4 py-3 shadow-sm"
               >
-                <div
-                  className="h-10 w-7 shrink-0 rounded-sm shadow-sm"
-                  style={{ background: `linear-gradient(135deg, ${color.cover}, ${color.spine})` }}
+                <img
+                  src="/notie-icon.jpg"
+                  alt=""
+                  className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-border"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-display text-base font-semibold text-foreground">{nb.title}</p>

@@ -1,11 +1,15 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+/** Prefer publishable key; fall back to legacy anon JWT. */
+const supabaseKey =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  '';
 export const APP_KEY = import.meta.env.VITE_APP_KEY || 'notie';
 
 export const REMEMBER_ME_KEY = 'notie_remember_me';
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 
 const sessionAwareStorage = {
   getItem: (key: string): string | null =>
@@ -30,7 +34,7 @@ const sessionAwareStorage = {
 /** Shared Skyland/Friday Canvas project; scoped via x-app-key. */
 export const supabase: SupabaseClient = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder',
+  supabaseKey || 'placeholder',
   {
     global: { headers: { 'x-app-key': APP_KEY } },
     auth: {

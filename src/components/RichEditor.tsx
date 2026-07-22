@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, type ReactNode } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -21,6 +21,8 @@ interface RichEditorProps {
   editable?: boolean;
   placeholder?: string;
   className?: string;
+  /** Renders on the right of the formatting toolbar (Inspiration + lamp). */
+  toolbarTrailing?: ReactNode;
 }
 
 function normalize(content: string): string {
@@ -32,7 +34,17 @@ function normalize(content: string): string {
  * toolbar — bold, italic, underline, lists, undo/redo. No AI actions.
  */
 export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
-  ({ content, onChange, editable = true, placeholder = 'Begin writing…', className }, ref) => {
+  (
+    {
+      content,
+      onChange,
+      editable = true,
+      placeholder = 'Begin writing…',
+      className,
+      toolbarTrailing,
+    },
+    ref,
+  ) => {
     const lastHtmlRef = useRef('');
     const isExternalUpdateRef = useRef(false);
 
@@ -97,67 +109,74 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
     return (
       <div className={cn('flex flex-col', className)}>
         {editable && (
-          <div className="mb-2 flex items-center gap-0.5 rounded-md border border-border bg-card/60 px-1.5 py-1 shadow-sm">
-            <button
-              type="button"
-              title="Bold"
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              className={toolbarBtn(editor.isActive('bold'))}
-            >
-              <Bold className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Italic"
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              className={toolbarBtn(editor.isActive('italic'))}
-            >
-              <Italic className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Underline"
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
-              className={toolbarBtn(editor.isActive('underline'))}
-            >
-              <UnderlineIcon className="h-3.5 w-3.5" />
-            </button>
-            <div className="mx-1 h-4 w-px bg-border" />
-            <button
-              type="button"
-              title="Bullet list"
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-              className={toolbarBtn(editor.isActive('bulletList'))}
-            >
-              <List className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Numbered list"
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              className={toolbarBtn(editor.isActive('orderedList'))}
-            >
-              <ListOrdered className="h-3.5 w-3.5" />
-            </button>
-            <div className="mx-1 h-4 w-px bg-border" />
-            <button
-              type="button"
-              title="Undo"
-              onClick={() => editor.chain().focus().undo().run()}
-              disabled={!editor.can().undo()}
-              className={cn(toolbarBtn(false), 'disabled:opacity-30')}
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Redo"
-              onClick={() => editor.chain().focus().redo().run()}
-              disabled={!editor.can().redo()}
-              className={cn(toolbarBtn(false), 'disabled:opacity-30')}
-            >
-              <Redo2 className="h-3.5 w-3.5" />
-            </button>
+          <div className="mb-2 flex items-center gap-2 rounded-md border border-border bg-card/60 px-1.5 py-1 shadow-sm">
+            <div className="flex min-w-0 flex-1 items-center gap-0.5">
+              <button
+                type="button"
+                title="Bold"
+                onClick={() => editor.chain().focus().toggleBold().run()}
+                className={toolbarBtn(editor.isActive('bold'))}
+              >
+                <Bold className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Italic"
+                onClick={() => editor.chain().focus().toggleItalic().run()}
+                className={toolbarBtn(editor.isActive('italic'))}
+              >
+                <Italic className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Underline"
+                onClick={() => editor.chain().focus().toggleUnderline().run()}
+                className={toolbarBtn(editor.isActive('underline'))}
+              >
+                <UnderlineIcon className="h-3.5 w-3.5" />
+              </button>
+              <div className="mx-1 h-4 w-px bg-border" />
+              <button
+                type="button"
+                title="Bullet list"
+                onClick={() => editor.chain().focus().toggleBulletList().run()}
+                className={toolbarBtn(editor.isActive('bulletList'))}
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Numbered list"
+                onClick={() => editor.chain().focus().toggleOrderedList().run()}
+                className={toolbarBtn(editor.isActive('orderedList'))}
+              >
+                <ListOrdered className="h-3.5 w-3.5" />
+              </button>
+              <div className="mx-1 h-4 w-px bg-border" />
+              <button
+                type="button"
+                title="Undo"
+                onClick={() => editor.chain().focus().undo().run()}
+                disabled={!editor.can().undo()}
+                className={cn(toolbarBtn(false), 'disabled:opacity-30')}
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Redo"
+                onClick={() => editor.chain().focus().redo().run()}
+                disabled={!editor.can().redo()}
+                className={cn(toolbarBtn(false), 'disabled:opacity-30')}
+              >
+                <Redo2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            {toolbarTrailing ? (
+              <div className="flex shrink-0 items-center gap-2 border-l border-border pl-2">
+                {toolbarTrailing}
+              </div>
+            ) : null}
           </div>
         )}
         <EditorContent editor={editor} />

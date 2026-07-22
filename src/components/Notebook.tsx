@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 import { useActivityTimer } from '@/hooks/useActivityTimer';
 import { localDb } from '@/lib/localDb';
 import type { Entry, NotebookMeta } from '@/lib/types';
-import { BOOK_COLORS } from '@/lib/types';
 import { formatShortDate, stripHtml } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { RichEditor } from '@/components/RichEditor';
 import { CategoriesPanel } from '@/components/CategoriesPanel';
+import { ReadingLamp } from '@/components/ReadingLamp';
 
 interface NotebookProps {
   userId: string;
@@ -90,8 +90,6 @@ export function Notebook({
     () => (entry ? localDb.getPreviousEntry(notebookId, entry.id) : null),
     [notebookId, entry],
   );
-
-  const color = BOOK_COLORS[(notebook?.colorIndex ?? 0) % BOOK_COLORS.length];
 
   const flushDraft = useCallback(
     (patch?: Partial<Pick<Entry, 'title' | 'content' | 'inspiration'>>) => {
@@ -201,9 +199,10 @@ export function Notebook({
         <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Back to Library">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div
-          className="h-8 w-6 shrink-0 rounded-sm shadow-sm"
-          style={{ background: `linear-gradient(135deg, ${color.cover}, ${color.spine})` }}
+        <img
+          src="/notie-icon.jpg"
+          alt=""
+          className="h-8 w-8 shrink-0 rounded-full object-cover ring-1 ring-border"
         />
         {renaming ? (
           <Input
@@ -267,6 +266,27 @@ export function Notebook({
             <RichEditor
               content={entry.content}
               onChange={(html) => scheduleDraft({ content: html })}
+              toolbarTrailing={
+                <div className="flex min-w-[11rem] max-w-[16rem] items-center gap-2">
+                  <ReadingLamp size={22} alt="" />
+                  <div className="min-w-0 flex-1">
+                    <label className="mb-0.5 block text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Inspiration
+                    </label>
+                    <Input
+                      value={entry.inspiration}
+                      placeholder="A line to return to"
+                      onChange={(e) => scheduleDraft({ inspiration: e.target.value })}
+                      onBlur={(e) => {
+                        const value = e.target.value;
+                        flushDraft({ inspiration: value });
+                        localDb.setInspiration(notebookId, value);
+                      }}
+                      className="h-7 border-none bg-secondary/40 px-1.5 text-xs shadow-none focus-visible:ring-1"
+                    />
+                  </div>
+                </div>
+              }
             />
           </ScrollArea>
           <p className="mt-2 text-[11px] text-muted-foreground">
