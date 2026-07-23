@@ -1,0 +1,2 @@
+[functions.fetch-ics-trial]
+verify_jwt = false

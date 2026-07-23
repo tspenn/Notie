@@ -124,8 +124,12 @@ const SECTIONS: Section[] = [
         body: 'Notie never writes back to your calendar. Events are pulled in for reference only — your real calendar stays exactly as you left it.',
       },
       {
+        heading: 'Works on the free trial',
+        body: 'You do not need a paid plan to try calendar sync. Paste a Google, Apple, or Outlook ICS link and tap Sync now — no account required for those providers.',
+      },
+      {
         heading: 'Sync on demand',
-        body: 'Hit Sync now any time. Your ICS URL is saved, so you only paste it once. School or work domains may need a one-click “Allow this source” the first time.',
+        body: 'Hit Sync now any time. Your ICS URL is saved, so you only paste it once. School or work domains may need a free account and a one-click “Allow this source” the first time.',
       },
     ],
   },

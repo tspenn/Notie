@@ -3,8 +3,9 @@ import { CheckCircle2, ChevronDown, ChevronUp, Link2, RefreshCw, X } from 'lucid
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchIcsText, resolveCalendarAuthUser } from '@/lib/calendarFetch';
 import { localDb } from '@/lib/localDb';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import {
   LOOKAHEAD_DAYS,
   LOOKBACK_DAYS,
@@ -16,28 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 export const NOTIE_CALENDAR_SYNC_EVENT = 'notie:calendar-sync-complete';
-
-async function fetchIcsText(url: string, accessToken: string | null): Promise<string> {
-  if (isSupabaseConfigured && accessToken) {
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-ics?url=${encodeURIComponent(url)}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
-    const json = (await res.json().catch(() => ({}))) as { ics?: string; error?: string };
-    if (!res.ok) {
-      const err = new Error(json.error || 'Fetch failed') as Error & { status?: number };
-      err.status = res.status;
-      throw err;
-    }
-    if (!json.ics) throw new Error('Empty calendar feed');
-    return json.ics;
-  }
-
-  // Local / unsigned: try a direct fetch (often blocked by CORS).
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Could not download calendar (${res.status})`);
-  return res.text();
-}
 
 function IcsCalendarCard({ userId }: { userId: string }) {
   const { mode, user } = useAuth();
@@ -87,8 +66,10 @@ function IcsCalendarCard({ userId }: { userId: string }) {
       toast.error('Paste a valid calendar URL first');
       return;
     }
-    if (mode !== 'cloud' || !user) {
-      toast.message('Sign in with Cloud Sync to allow school/work calendar hosts.');
+
+    const calendarUser = user ?? (await resolveCalendarAuthUser());
+    if (!calendarUser) {
+      toast.message('Create a free account to allow school or work calendar hosts.');
       return;
     }
 
@@ -97,7 +78,7 @@ function IcsCalendarCard({ userId }: { userId: string }) {
       const { data: existing } = await supabase
         .from('user_calendar_domain_allowlist')
         .select('id, is_active')
-        .eq('user_id', user.id)
+        .eq('user_id', calendarUser.id)
         .ilike('host_pattern', host)
         .maybeSingle();
 
@@ -107,12 +88,12 @@ function IcsCalendarCard({ userId }: { userId: string }) {
             .from('user_calendar_domain_allowlist')
             .update({ is_active: true, updated_at: new Date().toISOString() })
             .eq('id', existing.id)
-            .eq('user_id', user.id);
+            .eq('user_id', calendarUser.id);
           if (error) throw error;
         }
       } else {
         const { error } = await supabase.from('user_calendar_domain_allowlist').insert({
-          user_id: user.id,
+          user_id: calendarUser.id,
           host_pattern: host,
           is_active: true,
         });
@@ -144,29 +125,30 @@ function IcsCalendarCard({ userId }: { userId: string }) {
 
     try {
       let accessToken: string | null = null;
-      if (mode === 'cloud') {
+      if (mode === 'cloud' && user && !user.is_anonymous) {
         const { data } = await supabase.auth.getSession();
         accessToken = data.session?.access_token ?? null;
       }
 
-      let icsText: string;
-      try {
-        icsText = await fetchIcsText(urlToSync, accessToken);
-      } catch (err) {
-        const status = (err as { status?: number })?.status;
-        if (status === 403) {
+      const fetched = await fetchIcsText(urlToSync, {
+        accessToken,
+        trialUserId: mode === 'local' || user?.is_anonymous ? userId : null,
+      });
+
+      if (!fetched.ok) {
+        if (fetched.status === 403) {
           const host = extractHost(urlToSync);
           if (host) setBlockedHost(host);
           setShowTroubleshooting(true);
-          throw new Error('That calendar source is not trusted yet. Allow the host below, then sync again.');
-        }
-        if (!accessToken) {
           throw new Error(
-            'Could not reach that calendar from this browser. Sign in (Cloud Sync) so Notie can fetch your ICS link securely.',
+            fetched.error ||
+              'That calendar source is not trusted yet. Allow the host below, then sync again.',
           );
         }
-        throw err;
+        throw new Error(fetched.error);
       }
+
+      const icsText = fetched.ics;
 
       const events = parseIcs(icsText);
       const now = new Date();
@@ -434,8 +416,12 @@ function IcsCalendarCard({ userId }: { userId: string }) {
             </ol>
           </div>
           <p className="border-t border-border pt-2 text-muted-foreground">
-            Your private ICS URL acts as a password — only share it with apps you trust. Notie
-            fetches it server-side when you are signed in; it is never exposed publicly.
+            Your private ICS URL acts as a password — only share it with apps you trust. Notie fetches
+            it server-side; it is never exposed publicly.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Google, Apple, and Outlook calendars work on the free trial. School or work hosts may
+            need a free account.
           </p>
         </div>
       )}

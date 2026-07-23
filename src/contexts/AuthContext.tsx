@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { ensureCalendarSession } from '@/lib/calendarFetch';
 import { localDb } from '@/lib/localDb';
 import type { PlanKey, UserProfile } from '@/lib/types';
 
@@ -28,6 +29,29 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+function isAnonymousUser(user: User): boolean {
+  return user.is_anonymous === true;
+}
+
+function applySessionUser(sessionUser: User | null): {
+  mode: AuthMode;
+  user: User | null;
+  profile: UserProfile | null;
+} {
+  if (!sessionUser) {
+    if (localDb.hasLocalSession()) {
+      return { mode: 'local', user: null, profile: localDb.getProfile() };
+    }
+    return { mode: null, user: null, profile: null };
+  }
+
+  if (isAnonymousUser(sessionUser) && localDb.hasLocalSession()) {
+    return { mode: 'local', user: sessionUser, profile: localDb.getProfile() };
+  }
+
+  return { mode: 'cloud', user: sessionUser, profile: localDb.getProfile() };
+}
 
 function detectPasswordRecovery(): boolean {
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
@@ -66,32 +90,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         recoveryRef.current = true;
         setIsPasswordRecovery(true);
       }
-      if (newSession?.user) {
-        setUser(newSession.user);
-        setMode('cloud');
-      } else {
-        setUser(null);
-        // Only drop to signed-out if there is no active local session.
-        if (localDb.hasLocalSession()) {
-          setProfile(localDb.getProfile());
-          setMode('local');
-        } else {
-          setMode(null);
-        }
-      }
+      const next = applySessionUser(newSession?.user ?? null);
+      setUser(next.user);
+      setProfile(next.profile);
+      setMode(next.mode);
       setLoading(false);
     });
 
     supabase.auth
       .getSession()
       .then(({ data }) => {
-        if (data.session?.user) {
-          setUser(data.session.user);
-          setMode('cloud');
-        } else if (localDb.hasLocalSession()) {
-          setProfile(localDb.getProfile());
-          setMode('local');
-        }
+        const next = applySessionUser(data.session?.user ?? null);
+        setUser(next.user);
+        setProfile(next.profile);
+        setMode(next.mode);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -136,6 +148,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (mode === 'cloud') {
       await supabase.auth.signOut();
     } else {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.user?.is_anonymous) {
+        await supabase.auth.signOut();
+      }
       localDb.signOutLocal();
     }
     setUser(null);
@@ -147,13 +163,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const local = localDb.startLocalSession();
     setProfile(local);
     setMode('local');
+    if (isSupabaseConfigured) {
+      void ensureCalendarSession().then((token) => {
+        if (!token) return;
+        void supabase.auth.getUser().then(({ data }) => {
+          if (data.user?.is_anonymous) setUser(data.user);
+        });
+      });
+    }
   };
 
   const userId = mode === 'cloud' ? user?.id ?? null : mode === 'local' ? profile?.id ?? null : null;
   const displayName =
     (mode === 'cloud' ? (user?.user_metadata?.display_name as string | undefined) : profile?.displayName) ||
     'Writer';
-  const plan: PlanKey = mode === 'cloud' ? 'cloud_sync' : profile?.plan ?? 'one_device';
+  const plan: PlanKey =
+    mode === 'cloud' && user && !isAnonymousUser(user)
+      ? 'cloud_sync'
+      : profile?.plan ?? 'one_device';
 
   return (
     <AuthContext.Provider
