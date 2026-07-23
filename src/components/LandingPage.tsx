@@ -6,7 +6,7 @@ import { fetchNotieTiers, startNotieCheckout, type NotieBillingCycle } from '@/l
 import { Button } from '@/components/ui/button';
 import { AuthModal } from '@/components/AuthModal';
 import { NotieMark } from '@/components/NotieMark';
-import { brandHeaderClass, brandHeaderSurface } from '@/lib/brand';
+import { brandHeaderSurface } from '@/lib/brand';
 
 type PlanKey = 'one_device' | 'cloud_sync';
 
