@@ -6,6 +6,7 @@ import { fetchNotieTiers, startNotieCheckout, type NotieBillingCycle } from '@/l
 import { Button } from '@/components/ui/button';
 import { AuthModal } from '@/components/AuthModal';
 import { NotieMark } from '@/components/NotieMark';
+import { brandHeaderClass, brandHeaderSurface } from '@/lib/brand';
 
 type PlanKey = 'one_device' | 'cloud_sync';
 
@@ -92,13 +93,12 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
         </div>
       </div>
 
-      <header className="relative mx-auto flex max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
-        <div className="flex items-center gap-2">
-          <NotieMark size="md" alt="Notie" className="shadow-sm" />
-          <span className="font-display text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Notie
-          </span>
-        </div>
+      <header className={`relative ${brandHeaderSurface}`}>
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
+          <div className="flex items-center gap-2">
+            <NotieMark size="md" alt="Notie" className="shadow-sm" />
+            <span className="notie-wordmark text-2xl sm:text-3xl">Notie</span>
+          </div>
         <Button
           variant="ghost"
           onClick={() => {
@@ -108,6 +108,7 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
         >
           Sign in
         </Button>
+        </div>
       </header>
 
       <main className="relative mx-auto flex max-w-5xl flex-col px-5 pb-20 pt-8 sm:px-8 sm:pt-14">

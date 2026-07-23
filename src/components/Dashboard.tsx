@@ -22,6 +22,7 @@ import { GlobalSearch } from '@/components/GlobalSearch';
 import { Settings } from '@/components/Settings';
 import { ArchiveView } from '@/components/ArchiveView';
 import { NotieMark } from '@/components/NotieMark';
+import { brandHeaderClass } from '@/lib/brand';
 
 type MainTab = 'library' | 'calendar' | 'notes';
 
@@ -101,11 +102,11 @@ export function Dashboard() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-20 border-b border-border/80 bg-sand/85 backdrop-blur-md">
+      <header className={brandHeaderClass}>
         <div className="mx-auto flex min-h-16 max-w-6xl items-center gap-2 px-4 py-2 sm:px-6 md:min-h-[125px] md:gap-3 md:py-2">
           <NotieMark size="header" />
           <div className="min-w-0 flex-1">
-            <p className="font-display text-xl font-semibold leading-none text-foreground md:text-3xl">
+            <p className="notie-wordmark text-xl leading-none text-foreground md:text-3xl">
               Notie
             </p>
             <p className="mt-0.5 truncate text-xs text-muted-foreground md:mt-1 md:text-sm">

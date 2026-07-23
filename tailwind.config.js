@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ['"Fraunces"', 'Georgia', 'serif'],
+        display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
         body: ['"Source Serif 4"', 'Georgia', 'serif'],
         ui: ['"DM Sans"', 'system-ui', 'sans-serif'],
       },

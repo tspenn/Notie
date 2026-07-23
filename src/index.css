@@ -82,6 +82,38 @@
 }
 
 @layer utilities {
+  /**
+   * App header — vintage letters + pocket watch (matuska-hour-s-1994980.jpg).
+   * Gradient keeps the wordmark readable; watch shows through on the right.
+   */
+  .notie-brand-header {
+    background-color: hsl(var(--background));
+    background-image:
+      linear-gradient(
+        100deg,
+        hsl(42 32% 94% / 0.98) 0%,
+        hsl(42 30% 93% / 0.92) 38%,
+        hsl(42 28% 91% / 0.78) 58%,
+        hsl(42 26% 89% / 0.62) 100%
+      ),
+      url('/matuska-hour-s-1994980.jpg');
+    background-size: cover;
+    background-position: 70% 42%;
+  }
+
+  @media (min-width: 768px) {
+    .notie-brand-header {
+      background-position: 62% 38%;
+    }
+  }
+
+  .notie-wordmark {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: none;
+  }
+
   /* Faint fibrous paper grain overlay, applied to specific surfaces. */
   .paper-texture {
     position: relative;
@@ -129,7 +161,7 @@
 .notie-prose h1,
 .notie-prose h2,
 .notie-prose h3 {
-  font-family: '"Fraunces"', Georgia, serif;
+  font-family: '"Cormorant Garamond"', Georgia, serif;
   font-weight: 600;
   margin: 1.2em 0 0.5em;
 }
@@ -209,7 +241,7 @@
   border-color: hsl(var(--primary));
 }
 .notie-calendar .rbc-toolbar-label {
-  font-family: '"Fraunces"', Georgia, serif;
+  font-family: '"Cormorant Garamond"', Georgia, serif;
   font-weight: 600;
   font-size: 1.1rem;
 }
