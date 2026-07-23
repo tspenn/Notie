@@ -93,6 +93,19 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
 
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Library &amp; Growth
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Each notebook on your Library shelf is a writing project. The book binding shows{' '}
+                <span className="font-medium text-foreground">Growth</span> as that project grows —
+                the more you write and Save Entries, the taller the binding becomes.
+              </p>
+            </section>
+
+            <Separator />
+
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Note to self
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">

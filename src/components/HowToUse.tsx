@@ -41,7 +41,7 @@ const SECTIONS: Section[] = [
     steps: [
       {
         heading: 'Your shelf of notebooks',
-        body: 'Each column is a notebook that looks like a book on a shelf. Books grow as writing time. Tap a book to open its Entry List.',
+        body: 'Each binding on the shelf is a writing project, with its name on the spine. Growth shows as the binding gets taller. Tap a book to open its Entry List.',
       },
       {
         heading: 'Previous entry',

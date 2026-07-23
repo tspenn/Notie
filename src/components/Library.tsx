@@ -16,13 +16,32 @@ interface LibraryProps {
   refreshKey?: number;
 }
 
-/** Single book-styled progress bar (= Canvas LandscapeColumn). */
-function BookBar({ data, onOpen }: { data: NotebookShelfData; onOpen: () => void }) {
+/** Spine width varies slightly so the shelf reads like real bindings. */
+function spineWidth(title: string): number {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) hash = (hash * 31 + title.charCodeAt(i)) | 0;
+  return 36 + (Math.abs(hash) % 14); // 36–49px
+}
+
+/**
+ * Book binding on the Library shelf.
+ * Height = Canvas growth curve (investment minutes).
+ * Title runs sideways on the spine, top → bottom.
+ */
+function BookBinding({ data, onOpen }: { data: NotebookShelfData; onOpen: () => void }) {
+  const width = spineWidth(data.notebook.title);
+  const label =
+    data.totalMinutes > 0
+      ? `${data.notebook.title} · ${formatBarMinutes(data.totalMinutes)}${
+          data.todayMinutes > 0 ? ` · +${data.todayMinutes}m today` : ''
+        }`
+      : data.notebook.title;
+
   return (
-    <div className="animate-shelf-in flex min-w-[4.5rem] flex-col items-center">
+    <div className="animate-shelf-in flex flex-col items-center">
       {data.previousEntry && (
-        <p className="mb-2 w-full px-0.5 text-center text-[10px] leading-snug text-muted-foreground">
-          Previous entry:{' '}
+        <p className="mb-2 max-w-[4.5rem] px-0.5 text-center text-[10px] leading-snug text-muted-foreground">
+          Previous:{' '}
           <span className="font-medium text-foreground">
             {data.previousEntry.title || 'Untitled'}
           </span>
@@ -34,38 +53,48 @@ function BookBar({ data, onOpen }: { data: NotebookShelfData; onOpen: () => void
       <button
         type="button"
         onClick={onOpen}
-        className="group flex w-full flex-col items-center rounded-md px-1 py-1 transition hover:bg-secondary/40"
-        title={`Open “${data.notebook.title}”`}
+        title={label}
+        aria-label={`Open notebook ${data.notebook.title}`}
+        className="group relative flex shrink-0 flex-col items-center transition duration-300 hover:brightness-110"
+        style={{ width }}
       >
-        <p className="mb-1 line-clamp-2 w-full px-0.5 text-center font-display text-[11px] font-semibold leading-tight text-foreground">
-          {data.notebook.title}
-        </p>
-        {data.totalMinutes > 0 && (
-          <p className="mb-0.5 font-ui text-[10px] tabular-nums text-muted-foreground">
-            {formatBarMinutes(data.totalMinutes)}
-          </p>
-        )}
-        {data.todayMinutes > 0 && (
-          <p className="mb-1 font-ui text-[9px] tabular-nums text-moss">+{data.todayMinutes}m today</p>
-        )}
-
+        {/* Book binding / spine */}
         <div
-          className="relative w-11 overflow-hidden rounded-t-[3px] shadow-md transition duration-300 group-hover:brightness-110"
+          className="relative overflow-hidden rounded-t-[2px] shadow-md"
           style={{
+            width,
             height: data.barHeight,
-            background: `linear-gradient(180deg, ${data.color.cover} 0%, ${data.color.spine} 100%)`,
-            boxShadow: `0 -2px 14px 0 ${data.color.hex}40`,
+            background: `linear-gradient(90deg, ${data.color.spine} 0%, ${data.color.cover} 18%, ${data.color.cover} 82%, ${data.color.spine} 100%)`,
+            boxShadow: `2px 0 0 0 ${data.color.spine}99, -1px 0 0 0 rgba(0,0,0,0.35), 0 -2px 12px 0 ${data.color.hex}33`,
           }}
         >
-          <div
-            className="absolute inset-y-0 left-0 w-1.5"
-            style={{ backgroundColor: data.color.spine }}
-          />
-          <div className="absolute inset-x-2 top-2 h-px bg-black/15" />
-          <div className="absolute inset-x-2 bottom-3 h-px bg-black/10" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-white/10" />
+          {/* Binding edges */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-[3px] bg-black/35" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-[3px] bg-black/40" />
+          {/* Embossed bands */}
+          <div className="pointer-events-none absolute inset-x-1.5 top-2 h-px bg-black/25" />
+          <div className="pointer-events-none absolute inset-x-1.5 top-3 h-px bg-white/15" />
+          <div className="pointer-events-none absolute inset-x-1.5 bottom-3 h-px bg-black/20" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/25" />
+
+          {/* Project name on the binding — top to bottom */}
+          <div className="absolute inset-0 flex items-center justify-center px-0.5 py-3">
+            <span
+              className="max-h-full overflow-hidden text-ellipsis whitespace-nowrap font-display text-[10px] font-semibold tracking-wide text-sand drop-shadow-sm sm:text-[11px]"
+              style={{
+                writingMode: 'vertical-rl',
+                textOrientation: 'mixed',
+              }}
+            >
+              {data.notebook.title}
+            </span>
+          </div>
         </div>
-        <div className="h-px w-11" style={{ backgroundColor: data.color.hex, opacity: 0.55 }} />
+        {/* Shelf contact edge */}
+        <div
+          className="h-[3px] w-full rounded-b-[1px]"
+          style={{ backgroundColor: data.color.spine }}
+        />
       </button>
     </div>
   );
@@ -98,7 +127,6 @@ export function Library({ userId, onOpenBook, refreshKey = 0 }: LibraryProps) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl font-semibold text-foreground">Library</h2>
-          <p className="text-sm text-muted-foreground">Books grow as writing time.</p>
         </div>
         <Button onClick={() => setCreating(true)}>
           <Plus className="mr-1.5 h-4 w-4" />
@@ -111,8 +139,8 @@ export function Library({ userId, onOpenBook, refreshKey = 0 }: LibraryProps) {
           <ReadingLamp size={48} />
           <p className="mt-4 font-display text-lg text-foreground">The shelf is empty, for now.</p>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Start a notebook. Write freely, then Save Entry when a block of writing is finished —
-            that fills the book.
+            Start a notebook for a writing project. Save Entry when a block of writing is finished —
+            the binding on the shelf shows Growth.
           </p>
           <Button className="mt-5" onClick={() => setCreating(true)}>
             <Plus className="mr-1.5 h-4 w-4" />
@@ -121,9 +149,9 @@ export function Library({ userId, onOpenBook, refreshKey = 0 }: LibraryProps) {
         </div>
       ) : (
         <div className="overflow-x-auto pb-2">
-          <div className="flex min-h-[260px] items-end gap-6 border-b border-border/80 px-2 pt-4">
+          <div className="flex min-h-[260px] items-end gap-2.5 border-b border-border/80 px-2 pt-4 sm:gap-3">
             {shelf.map((data) => (
-              <BookBar
+              <BookBinding
                 key={data.notebook.id}
                 data={data}
                 onOpen={() => onOpenBook(data.notebook.id)}
