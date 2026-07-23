@@ -1,6 +1,7 @@
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LandingPage } from '@/components/LandingPage';
 import { Dashboard } from '@/components/Dashboard';
+import { NotieMark } from '@/components/NotieMark';
 import { Toaster } from '@/components/ui/sonner';
 
 function PrivacyPage() {
@@ -52,7 +53,7 @@ function AppContent() {
     return (
       <div className="flex min-h-dvh items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <img src="/notie-mark.png" alt="Notie" className="h-16 w-12 rounded-lg bg-sand object-contain ring-1 ring-border" />
+          <NotieMark size="lg" alt="Notie" />
           <p className="font-display text-lg text-muted-foreground">Opening your shelf…</p>
         </div>
       </div>

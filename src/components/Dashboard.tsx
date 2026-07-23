@@ -21,6 +21,7 @@ import { Notebook } from '@/components/Notebook';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { Settings } from '@/components/Settings';
 import { ArchiveView } from '@/components/ArchiveView';
+import { NotieMark } from '@/components/NotieMark';
 
 type MainTab = 'library' | 'calendar' | 'notes';
 
@@ -101,12 +102,8 @@ export function Dashboard() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-border/80 bg-sand/85 backdrop-blur-md">
-        <div className="mx-auto flex min-h-16 max-w-6xl items-center gap-3 px-4 py-3 sm:px-6 md:min-h-[125px] md:gap-4 md:py-5">
-          <img
-            src="/notie-mark.png"
-            alt=""
-            className="h-11 w-9 shrink-0 rounded-lg bg-sand object-contain ring-1 ring-border md:h-[4.5rem] md:w-14 lg:h-20 lg:w-16"
-          />
+        <div className="mx-auto flex min-h-16 max-w-6xl items-center gap-2 px-4 py-2 sm:px-6 md:min-h-[125px] md:gap-3 md:py-2">
+          <NotieMark size="header" />
           <div className="min-w-0 flex-1">
             <p className="font-display text-xl font-semibold leading-none text-foreground md:text-3xl">
               Notie

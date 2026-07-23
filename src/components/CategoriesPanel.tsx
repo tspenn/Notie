@@ -36,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { NotieMark } from '@/components/NotieMark';
 
 interface CategoriesPanelProps {
   userId: string;
@@ -602,11 +603,7 @@ export function CategoriesPanel({
                 onClick={() => sendToNotebook(nb.id)}
                 className="flex w-full items-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-left text-sm hover:border-moss/50"
               >
-                <img
-                  src="/notie-mark.png"
-                  alt=""
-                  className="h-7 w-6 rounded-md bg-sand object-contain ring-1 ring-border"
-                />
+                <NotieMark size="sm" />
                 <span className="truncate font-medium">{nb.title}</span>
               </button>
             ))}

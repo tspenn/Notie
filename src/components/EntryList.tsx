@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ReadingLamp } from '@/components/ReadingLamp';
+import { NotieMark } from '@/components/NotieMark';
 
 interface EntryListProps {
   userId: string;
@@ -67,11 +68,7 @@ export function EntryList({
         <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to Library">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <img
-          src="/notie-mark.png"
-          alt=""
-          className="h-9 w-7 shrink-0 rounded-md bg-sand object-contain ring-1 ring-border"
-        />
+        <NotieMark size="md" />
         <div className="min-w-0 flex-1">
           <h2 className="truncate font-display text-2xl font-semibold text-foreground">
             {notebook.title}

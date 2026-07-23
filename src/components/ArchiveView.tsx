@@ -5,6 +5,7 @@ import { localDb } from '@/lib/localDb';
 import type { NotebookMeta } from '@/lib/types';
 import { formatShortDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { NotieMark } from '@/components/NotieMark';
 
 interface ArchiveViewProps {
   userId: string;
@@ -65,11 +66,7 @@ export function ArchiveView({ userId, onBack }: ArchiveViewProps) {
                 key={nb.id}
                 className="flex items-center gap-3 rounded-lg border border-border bg-card/70 px-4 py-3 shadow-sm"
               >
-                <img
-                  src="/notie-mark.png"
-                  alt=""
-                  className="h-9 w-7 shrink-0 rounded-md bg-sand object-contain ring-1 ring-border"
-                />
+                <NotieMark size="md" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-display text-base font-semibold text-foreground">{nb.title}</p>
                   <p className="text-xs text-muted-foreground">Archived · updated {formatShortDate(nb.updatedAt)}</p>

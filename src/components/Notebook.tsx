@@ -14,6 +14,7 @@ import { RichEditor } from '@/components/RichEditor';
 import { CategoriesPanel } from '@/components/CategoriesPanel';
 import { ReadingLamp } from '@/components/ReadingLamp';
 import { SelectionActionDialog } from '@/components/SelectionActionDialog';
+import { NotieMark } from '@/components/NotieMark';
 
 interface NotebookProps {
   userId: string;
@@ -203,11 +204,7 @@ export function Notebook({
         <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Back to Library">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <img
-          src="/notie-mark.png"
-          alt=""
-          className="h-8 w-7 shrink-0 rounded-md bg-sand object-contain ring-1 ring-border"
-        />
+        <NotieMark size="sm" />
         {renaming ? (
           <Input
             autoFocus
