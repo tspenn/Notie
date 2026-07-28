@@ -186,6 +186,36 @@ export const localDb = {
     write(store);
   },
 
+  /** Align local profile id with a signed-in Supabase user (for trial clock + plan). */
+  ensureProfileForCloudUser(cloudUserId: string, plan: PlanKey = 'trial'): UserProfile {
+    const store = read();
+    if (store.profile) {
+      if (store.profile.id !== cloudUserId) {
+        const prior = store.profile.id;
+        store.profile.id = cloudUserId;
+        write(store);
+        this.reassignUserId(prior, cloudUserId);
+      }
+      if (plan === 'trial' && store.profile.plan !== 'one_device' && store.profile.plan !== 'cloud_sync') {
+        this.setPlan('trial');
+      }
+      return this.getProfile()!;
+    }
+    const now = nowIso();
+    const profile: UserProfile = {
+      id: cloudUserId,
+      email: 'cloud@notie.app',
+      displayName: 'Writer',
+      plan,
+      trialStartedAt: plan === 'trial' ? now : null,
+      welcomeCompletedAt: null,
+      createdAt: now,
+    };
+    store.profile = profile;
+    write(store);
+    return profile;
+  },
+
   completeWelcome(): void {
     const store = read();
     if (!store.profile) return;
@@ -768,5 +798,104 @@ export const localDb = {
             .includes(q)),
     );
     return { notebooks, entries, savedItems };
+  },
+
+  listAllSavedItems(userId: string): SavedItem[] {
+    return read().savedItems.filter((s) => s.userId === userId);
+  },
+
+  /** Move all library rows from one user id to another (trial → signed-in Sync). */
+  reassignUserId(fromUserId: string, toUserId: string): void {
+    if (!fromUserId || !toUserId || fromUserId === toUserId) return;
+    const store = read();
+    for (const n of store.notebooks) if (n.userId === fromUserId) n.userId = toUserId;
+    for (const e of store.entries) if (e.userId === fromUserId) e.userId = toUserId;
+    for (const p of store.progressRows) if (p.userId === fromUserId) p.userId = toUserId;
+    for (const s of store.savedItems) if (s.userId === fromUserId) s.userId = toUserId;
+    for (const c of store.customCategories) if (c.userId === fromUserId) c.userId = toUserId;
+    for (const ev of store.events) if (ev.userId === fromUserId) ev.userId = toUserId;
+    for (const note of store.notesToSelf) if (note.userId === fromUserId) note.userId = toUserId;
+    if (store.profile?.id === fromUserId) store.profile.id = toUserId;
+    write(store);
+    if (localStorage.getItem('notie_local_session') === fromUserId) {
+      localStorage.setItem('notie_local_session', toUserId);
+    }
+  },
+
+  /** Strip `nb_` / `entry_` prefixes so ids are valid Postgres UUIDs. */
+  normalizeIdsForCloud(userId: string): void {
+    const store = read();
+    const map = new Map<string, string>();
+    const norm = (id: string) => {
+      const existing = map.get(id);
+      if (existing) return existing;
+      const match = id.match(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+      );
+      const next = match?.[0] ?? id;
+      map.set(id, next);
+      return next;
+    };
+
+    for (const n of store.notebooks) {
+      if (n.userId !== userId) continue;
+      n.id = norm(n.id);
+    }
+    for (const e of store.entries) {
+      if (e.userId !== userId) continue;
+      e.id = norm(e.id);
+      e.notebookId = norm(e.notebookId);
+    }
+    for (const p of store.progressRows) {
+      if (p.userId !== userId) continue;
+      p.id = norm(p.id);
+      p.notebookId = norm(p.notebookId);
+      if (p.entryId) p.entryId = norm(p.entryId);
+    }
+    for (const s of store.savedItems) {
+      if (s.userId !== userId) continue;
+      s.id = norm(s.id);
+      s.notebookId = norm(s.notebookId);
+      if (s.entryId) s.entryId = norm(s.entryId);
+    }
+    for (const c of store.customCategories) {
+      if (c.userId !== userId) continue;
+      c.id = norm(c.id);
+      c.notebookId = norm(c.notebookId);
+    }
+    write(store);
+  },
+
+  upsertNotebookFromCloud(row: NotebookMeta): void {
+    const store = read();
+    const existing = store.notebooks.find((n) => n.id === row.id);
+    if (!existing) {
+      store.notebooks.push(row);
+    } else if (row.updatedAt >= existing.updatedAt) {
+      Object.assign(existing, row);
+    }
+    write(store);
+  },
+
+  upsertEntryFromCloud(row: Entry): void {
+    const store = read();
+    const existing = store.entries.find((e) => e.id === row.id);
+    if (!existing) {
+      store.entries.push(row);
+    } else if (row.updatedAt >= existing.updatedAt) {
+      Object.assign(existing, row);
+    }
+    write(store);
+  },
+
+  upsertSavedItemFromCloud(row: SavedItem): void {
+    const store = read();
+    const existing = store.savedItems.find((s) => s.id === row.id);
+    if (!existing) {
+      store.savedItems.push(row);
+    } else {
+      Object.assign(existing, row);
+    }
+    write(store);
   },
 };

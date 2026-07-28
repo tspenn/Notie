@@ -1,8 +1,13 @@
+import { useEffect } from 'react';
+import { toast } from 'sonner';
+
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { LandingPage } from '@/components/LandingPage';
 import { Dashboard } from '@/components/Dashboard';
+import { TrialExpiredGate } from '@/components/TrialExpiredGate';
 import { NotieMark } from '@/components/NotieMark';
 import { Toaster } from '@/components/ui/sonner';
+import { applyCheckoutSuccess } from '@/lib/plan';
 
 function PrivacyPage() {
   return (
@@ -42,6 +47,50 @@ function TermsPage() {
   );
 }
 
+function CheckoutReturnHandler() {
+  const { user, mode, refreshPlan, syncNow } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get('checkout');
+    if (!checkout) return;
+
+    const clearParam = () => {
+      params.delete('checkout');
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`;
+      window.history.replaceState({}, '', next);
+    };
+
+    if (checkout === 'cancelled') {
+      toast.message('Checkout cancelled — your trial or plan is unchanged.');
+      clearParam();
+      return;
+    }
+
+    if (checkout === 'success') {
+      void (async () => {
+        if (mode === 'cloud' && user) {
+          const plan = await applyCheckoutSuccess(user.id);
+          await refreshPlan();
+          if (plan === 'cloud_sync') {
+            await syncNow();
+            toast.success('Sync is active — your library can follow you across devices.');
+          } else if (plan === 'one_device') {
+            toast.success('Download unlocked — your writing stays on this device.');
+          } else {
+            toast.message('Payment received. If your plan does not update in a moment, tap Refresh plan in Settings.');
+          }
+        } else {
+          toast.success('Payment received. Sign in to activate your plan on this device.');
+        }
+        clearParam();
+      })();
+    }
+  }, [mode, user, refreshPlan, syncNow]);
+
+  return null;
+}
+
 function AppContent() {
   const { mode, loading } = useAuth();
   const path = window.location.pathname;
@@ -61,12 +110,18 @@ function AppContent() {
   }
 
   if (!mode) return <LandingPage />;
-  return <Dashboard />;
+
+  return (
+    <TrialExpiredGate>
+      <Dashboard />
+    </TrialExpiredGate>
+  );
 }
 
 export default function App() {
   return (
     <AuthProvider>
+      <CheckoutReturnHandler />
       <AppContent />
       <Toaster />
     </AuthProvider>

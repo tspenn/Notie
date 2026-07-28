@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { Archive, Bell, BookOpen, CalendarDays, HelpCircle, LogOut } from 'lucide-react';
+import { Archive, Bell, BookOpen, CalendarDays, HelpCircle, LogOut, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchNotieTiers, startNotieCheckout } from '@/lib/checkout';
+import { canCloudSync, planLabel } from '@/lib/plan';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { HowToUse } from '@/components/HowToUse';
+import { AuthModal } from '@/components/AuthModal';
 
 interface SettingsProps {
   open: boolean;
@@ -16,15 +19,14 @@ interface SettingsProps {
   onOpenCalendar?: () => void;
 }
 
-const PLAN_LABEL: Record<string, string> = {
-  one_device: 'Download — $9.99 one-time',
-  cloud_sync: 'Sync — $3.99/mo or $39.99/year',
-};
-
 const NOTE_TO_SELF_PREF = 'notie_note_to_self_enabled';
 
 export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: SettingsProps) {
-  const { mode, plan, displayName, user, signOut } = useAuth();
+  const { mode, plan, displayName, user, signOut, trialDaysRemaining, refreshPlan, syncNow } =
+    useAuth();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [planBusy, setPlanBusy] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission>(
     typeof Notification !== 'undefined' ? Notification.permission : 'denied',
   );
@@ -71,7 +73,11 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
               </h3>
               <p className="mt-2 font-display text-lg text-foreground">{displayName}</p>
               <p className="text-sm text-muted-foreground">
-                {mode === 'cloud' ? user?.email : 'Download / One Device — stored on this browser only'}
+                {mode === 'cloud'
+                  ? user?.email
+                  : plan === 'trial'
+                    ? 'Free trial — stored on this browser'
+                    : 'Download — stored on this browser only'}
               </p>
             </section>
 
@@ -81,12 +87,105 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Plan
               </h3>
-              <p className="mt-2 text-sm text-foreground">{PLAN_LABEL[plan] ?? plan}</p>
-              {mode === 'local' && (
+              <p className="mt-2 text-sm text-foreground">{planLabel(plan)}</p>
+              {plan === 'trial' && trialDaysRemaining !== null && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Writing stays on this device. Upgrade to Sync any time to write from anywhere.
+                  {trialDaysRemaining > 0
+                    ? `${trialDaysRemaining} day${trialDaysRemaining === 1 ? '' : 's'} left in your free trial.`
+                    : 'Your free trial has ended.'}
                 </p>
               )}
+              {plan === 'one_device' && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Download plan — library stays on this device only. Upgrade to Sync to write on
+                  other devices.
+                </p>
+              )}
+              {canCloudSync(plan) ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Sync is on — notebooks push to your private cloud for other devices.
+                </p>
+              ) : (
+                plan !== 'one_device' && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Writing stays on this device until you start Sync.
+                  </p>
+                )
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                {mode === 'cloud' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={planBusy}
+                    onClick={async () => {
+                      setPlanBusy(true);
+                      try {
+                        const next = await refreshPlan();
+                        toast.success(`Plan: ${planLabel(next)}`);
+                      } catch {
+                        toast.error('Could not refresh plan');
+                      } finally {
+                        setPlanBusy(false);
+                      }
+                    }}
+                  >
+                    <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                    Refresh plan
+                  </Button>
+                )}
+                {canCloudSync(plan) && mode === 'cloud' && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={syncBusy}
+                    onClick={async () => {
+                      setSyncBusy(true);
+                      try {
+                        await syncNow();
+                        toast.success('Library synced');
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : 'Sync failed');
+                      } finally {
+                        setSyncBusy(false);
+                      }
+                    }}
+                  >
+                    <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${syncBusy ? 'animate-spin' : ''}`} />
+                    {syncBusy ? 'Syncing…' : 'Sync now'}
+                  </Button>
+                )}
+                {(plan === 'trial' || plan === 'one_device') && (
+                  <Button
+                    size="sm"
+                    disabled={planBusy}
+                    onClick={async () => {
+                      if (mode !== 'cloud') {
+                        setAuthOpen(true);
+                        return;
+                      }
+                      setPlanBusy(true);
+                      try {
+                        const tiers = await fetchNotieTiers();
+                        const syncTier = tiers.find(
+                          (t) =>
+                            (t.features?.key as string) === 'cloud_sync' || t.name === 'Cloud Sync',
+                        );
+                        if (!syncTier) throw new Error('Sync plan not found');
+                        await startNotieCheckout({
+                          tierId: syncTier.id,
+                          billingCycle: 'monthly',
+                        });
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : 'Checkout failed');
+                        setPlanBusy(false);
+                      }
+                    }}
+                  >
+                    Upgrade to Sync
+                  </Button>
+                )}
+              </div>
             </section>
 
             <Separator />
@@ -222,6 +321,8 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
         onClose={() => setHowToOpen(false)}
         initialSection={howToSection}
       />
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="signup" />
     </>
   );
 }

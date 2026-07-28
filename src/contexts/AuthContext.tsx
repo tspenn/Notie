@@ -1,31 +1,32 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { ensureCalendarSession } from '@/lib/calendarFetch';
+import { adoptLocalLibrary, syncLibrary } from '@/lib/cloudSync';
 import { localDb } from '@/lib/localDb';
+import { resolveEffectivePlan } from '@/lib/plan';
 import type { PlanKey, UserProfile } from '@/lib/types';
 
 export type AuthMode = 'cloud' | 'local' | null;
 
 interface AuthContextType {
-  /** Supabase user — set only in 'cloud' mode. */
+  /** Supabase user — set in cloud mode, and optionally anonymous during local trial. */
   user: User | null;
-  /** Local-only profile (localDb) — set in 'local' mode, and also used to
-   *  remember plan/display-name preferences alongside a cloud account. */
   profile: UserProfile | null;
   loading: boolean;
-  /** 'cloud' = signed in with Supabase auth. 'local' = One Device session. null = signed out. */
+  /** 'cloud' = signed in with Supabase auth. 'local' = trial / one-device session. null = signed out. */
   mode: AuthMode;
-  /** Stable id used to scope localDb rows, regardless of mode. */
   userId: string | null;
   displayName: string;
   plan: PlanKey;
+  trialDaysRemaining: number | null;
   isPasswordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName?: string) => Promise<{ requiresConfirmation: boolean }>;
   signOut: () => Promise<void>;
-  /** Start a local-only ("One Device") session — no Supabase account required. */
   startLocal: () => void;
+  refreshPlan: () => Promise<PlanKey>;
+  syncNow: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -64,10 +65,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [mode, setMode] = useState<AuthMode>(null);
   const [loading, setLoading] = useState(true);
+  const [plan, setPlan] = useState<PlanKey>('trial');
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const recoveryRef = useRef(false);
+  const priorLocalIdRef = useRef<string | null>(null);
 
   const APP_URL = import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin;
+
+  const refreshPlan = useCallback(async (): Promise<PlanKey> => {
+    const local = localDb.getProfile();
+    const cloudId =
+      user && !isAnonymousUser(user) ? user.id : null;
+    const next = await resolveEffectivePlan({
+      cloudUserId: cloudId,
+      isAnonymous: Boolean(user && isAnonymousUser(user)),
+      localPlan: local?.plan ?? profile?.plan ?? 'trial',
+    });
+    setPlan(next);
+    setProfile(localDb.getProfile());
+    return next;
+  }, [user, profile?.plan]);
+
+  const syncNow = useCallback(async () => {
+    if (!user || isAnonymousUser(user)) return;
+    const effective = await refreshPlan();
+    if (effective !== 'cloud_sync') return;
+
+    const prior = priorLocalIdRef.current || localDb.getProfile()?.id;
+    if (prior && prior !== user.id) {
+      adoptLocalLibrary(prior, user.id);
+      priorLocalIdRef.current = null;
+    }
+
+    await syncLibrary({ cloudUserId: user.id, plan: effective });
+    setProfile(localDb.getProfile());
+  }, [user, refreshPlan]);
 
   useEffect(() => {
     if (detectPasswordRecovery()) {
@@ -76,10 +108,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!isSupabaseConfigured) {
-      // No cloud project configured — fall back to whatever local session exists.
       if (localDb.hasLocalSession()) {
-        setProfile(localDb.getProfile());
+        const p = localDb.getProfile();
+        setProfile(p);
         setMode('local');
+        setPlan(p?.plan ?? 'trial');
       }
       setLoading(false);
       return;
@@ -116,12 +149,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (loading) return;
+    void refreshPlan();
+  }, [loading, mode, user?.id, refreshPlan]);
+
+  useEffect(() => {
+    if (mode !== 'cloud' || !user || isAnonymousUser(user) || plan !== 'cloud_sync') return;
+    let cancelled = false;
+    void (async () => {
+      if (cancelled) return;
+      await syncNow();
+    })();
+    const id = window.setInterval(() => {
+      void syncNow();
+    }, 5 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+    // Intentionally keyed on identity + plan, not syncNow identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, user?.id, plan]);
+
   const signIn = async (email: string, password: string) => {
+    const localId = localDb.getProfile()?.id ?? null;
+    if (localId) priorLocalIdRef.current = localId;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   };
 
   const signUp = async (email: string, password: string, displayName?: string) => {
+    const localId = localDb.getProfile()?.id ?? null;
+    if (localId) priorLocalIdRef.current = localId;
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -136,8 +196,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       throw error;
     }
-    // Supabase returns a fake success (no error, no email) for an address that
-    // already exists on the shared project.
     if (data?.user?.identities?.length === 0) {
       throw new Error('__existing__');
     }
@@ -157,12 +215,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     setProfile(null);
     setMode(null);
+    setPlan('trial');
   };
 
   const startLocal = () => {
     const local = localDb.startLocalSession();
     setProfile(local);
     setMode('local');
+    setPlan(local.plan);
     if (isSupabaseConfigured) {
       void ensureCalendarSession().then((token) => {
         if (!token) return;
@@ -173,14 +233,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const userId = mode === 'cloud' ? user?.id ?? null : mode === 'local' ? profile?.id ?? null : null;
+  const userId =
+    mode === 'cloud' && user && !isAnonymousUser(user)
+      ? user.id
+      : mode === 'local'
+        ? profile?.id ?? null
+        : null;
+
   const displayName =
     (mode === 'cloud' ? (user?.user_metadata?.display_name as string | undefined) : profile?.displayName) ||
     'Writer';
-  const plan: PlanKey =
-    mode === 'cloud' && user && !isAnonymousUser(user)
-      ? 'cloud_sync'
-      : profile?.plan ?? 'one_device';
+
+  const trialDaysRemaining =
+    plan === 'trial' ? localDb.getTrialDaysRemaining() : null;
 
   return (
     <AuthContext.Provider
@@ -192,11 +257,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId,
         displayName,
         plan,
+        trialDaysRemaining,
         isPasswordRecovery,
         signIn,
         signUp,
         signOut,
         startLocal,
+        refreshPlan,
+        syncNow,
       }}
     >
       {children}
