@@ -143,6 +143,27 @@ export const localDb = {
     return read();
   },
 
+  /** Replace the entire local store (backup restore). */
+  replaceStore(store: NotieStore): void {
+    if (!store || store.version !== 2) {
+      throw new Error('Invalid Notie store');
+    }
+    write({
+      version: 2,
+      profile: store.profile ?? null,
+      notebooks: store.notebooks ?? [],
+      entries: store.entries ?? [],
+      progressRows: store.progressRows ?? [],
+      savedItems: store.savedItems ?? [],
+      events: store.events ?? [],
+      notesToSelf: store.notesToSelf ?? [],
+      customCategories: store.customCategories ?? [],
+    });
+    if (store.profile?.id) {
+      localStorage.setItem('notie_local_session', store.profile.id);
+    }
+  },
+
   getProfile(): UserProfile | null {
     return read().profile;
   },
@@ -802,6 +823,35 @@ export const localDb = {
 
   listAllSavedItems(userId: string): SavedItem[] {
     return read().savedItems.filter((s) => s.userId === userId);
+  },
+
+  listAllProgress(userId: string): ProgressRow[] {
+    return read().progressRows.filter((p) => p.userId === userId);
+  },
+
+  listAllCustomCategories(userId: string) {
+    return read().customCategories.filter((c) => c.userId === userId);
+  },
+
+  upsertProgressFromCloud(row: ProgressRow): void {
+    const store = read();
+    const existing = store.progressRows.find((p) => p.id === row.id);
+    if (!existing) store.progressRows.push(row);
+    else Object.assign(existing, row);
+    write(store);
+  },
+
+  upsertCustomCategoryFromCloud(row: {
+    id: string;
+    userId: string;
+    notebookId: string;
+    name: string;
+  }): void {
+    const store = read();
+    const existing = store.customCategories.find((c) => c.id === row.id);
+    if (!existing) store.customCategories.push(row);
+    else Object.assign(existing, row);
+    write(store);
   },
 
   /** Move all library rows from one user id to another (trial → signed-in Sync). */

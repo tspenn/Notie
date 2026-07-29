@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, BookOpen, Clock, Save, X } from 'lucide-react';
+import { ArrowLeft, BookOpen, Clock, Download, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { useAuth } from '@/contexts/AuthContext';
 import { useActivityTimer } from '@/hooks/useActivityTimer';
 import { localDb } from '@/lib/localDb';
 import type { Entry, NotebookMeta } from '@/lib/types';
@@ -42,6 +43,7 @@ export function Notebook({
   onClose,
   onEntrySaved,
 }: NotebookProps) {
+  const { syncNow } = useAuth();
   const [notebook, setNotebook] = useState<NotebookMeta | null>(null);
   const [entry, setEntry] = useState<Entry | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -169,6 +171,20 @@ export function Notebook({
     setEntry(result.nextOpen);
     refreshHistory();
     onEntrySaved?.();
+    void syncNow();
+  };
+
+  const exportEntry = () => {
+    if (!entry) return;
+    const text = `${entry.title || 'Untitled entry'}\n\n${stripHtml(entry.content)}`;
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(entry.title || 'entry').replace(/[^\w.-]+/g, '_')}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Entry exported');
   };
 
   const reopenPastEntry = (past: Entry) => {
@@ -234,6 +250,10 @@ export function Notebook({
           {draftHint === 'saving' ? 'Saving draft…' : draftHint === 'saved' ? 'Draft saved' : 'Draft'}
         </span>
         <div className="ml-auto flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={exportEntry} title="Export this entry as text">
+            <Download className="mr-1.5 h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Export</span>
+          </Button>
           <Button size="sm" onClick={handleSaveEntry} disabled={savingEntry}>
             <Save className="mr-1.5 h-3.5 w-3.5" />
             Save Entry

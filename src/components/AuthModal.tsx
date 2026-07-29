@@ -63,7 +63,9 @@ export function AuthModal({ open, onClose, initialMode = 'signin' }: AuthModalPr
         <DialogHeader>
           <DialogTitle>{mode === 'signin' ? 'Sign in' : 'Create your account'}</DialogTitle>
           <DialogDescription>
-            Cloud Sync keeps your notebooks across devices at my-notie.com.
+            {mode === 'signup'
+              ? 'Create a free account to start your 30-day trial — Sync across devices included.'
+              : 'Sign in to open your library on this device.'}
           </DialogDescription>
         </DialogHeader>
 

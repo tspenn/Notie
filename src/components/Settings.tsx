@@ -1,8 +1,19 @@
-import { useState } from 'react';
-import { Archive, Bell, BookOpen, CalendarDays, HelpCircle, LogOut, RefreshCw } from 'lucide-react';
+import { useRef, useState } from 'react';
+import {
+  Archive,
+  Bell,
+  BookOpen,
+  CalendarDays,
+  Download,
+  HelpCircle,
+  LogOut,
+  RefreshCw,
+  Upload,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { downloadNotieBackup, restoreNotieBackup } from '@/lib/backup';
 import { fetchNotieTiers, startNotieCheckout } from '@/lib/checkout';
 import { canCloudSync, planLabel } from '@/lib/plan';
 import { Button } from '@/components/ui/button';
@@ -27,6 +38,8 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
   const [authOpen, setAuthOpen] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
   const [permission, setPermission] = useState<NotificationPermission>(
     typeof Notification !== 'undefined' ? Notification.permission : 'denied',
   );
@@ -95,22 +108,21 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
                     : 'Your free trial has ended.'}
                 </p>
               )}
-              {plan === 'one_device' && (
+              {plan === 'trial' && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Download plan — library stays on this device only. Upgrade to Sync to write on
-                  other devices.
+                  Sync across devices is included for your trial. Export / Save to Device is always
+                  yours.
                 </p>
               )}
-              {canCloudSync(plan) ? (
+              {plan === 'one_device' && (
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Sync is on — notebooks push to your private cloud for other devices.
+                  One device forever. Upgrade to Sync anytime to write on other devices.
                 </p>
-              ) : (
-                plan !== 'one_device' && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Writing stays on this device until you start Sync.
-                  </p>
-                )
+              )}
+              {plan === 'cloud_sync' && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Sync is on — your library follows every device you sign in on.
+                </p>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
                 {mode === 'cloud' && (
@@ -185,6 +197,81 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
                     Upgrade to Sync
                   </Button>
                 )}
+              </div>
+            </section>
+
+            <Separator />
+
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Backup &amp; export
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Download a full encrypted library backup (.notiebak), or restore one onto this
+                device. Available on every plan — your writing is yours.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={backupBusy}
+                  onClick={async () => {
+                    setBackupBusy(true);
+                    try {
+                      await downloadNotieBackup();
+                      toast.success('Backup downloaded');
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : 'Backup failed');
+                    } finally {
+                      setBackupBusy(false);
+                    }
+                  }}
+                >
+                  <Download className="mr-1.5 h-3.5 w-3.5" />
+                  {backupBusy ? 'Working…' : 'Download backup'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={backupBusy}
+                  onClick={() => restoreInputRef.current?.click()}
+                >
+                  <Upload className="mr-1.5 h-3.5 w-3.5" />
+                  Restore backup
+                </Button>
+                <input
+                  ref={restoreInputRef}
+                  type="file"
+                  accept=".notiebak,application/octet-stream"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    if (
+                      !window.confirm(
+                        'Restore will replace the library on this device with the backup. Continue?',
+                      )
+                    ) {
+                      return;
+                    }
+                    setBackupBusy(true);
+                    try {
+                      const result = await restoreNotieBackup(
+                        file,
+                        mode === 'cloud' ? user?.id : null,
+                      );
+                      toast.success(
+                        `Restored ${result.notebooks} notebook${result.notebooks === 1 ? '' : 's'}, ${result.entries} entries`,
+                      );
+                      window.location.reload();
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Restore failed');
+                    } finally {
+                      setBackupBusy(false);
+                    }
+                  }}
+                />
               </div>
             </section>
 

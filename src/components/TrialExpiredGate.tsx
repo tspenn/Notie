@@ -77,7 +77,7 @@ export function TrialExpiredGate({ children }: { children: React.ReactNode }) {
               Your free trial has ended
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Choose Download for this device, or Sync to keep writing across devices.
+              Do you want to use only one device, or access your writing across devices?
             </p>
           </div>
         </div>
@@ -89,7 +89,9 @@ export function TrialExpiredGate({ children }: { children: React.ReactNode }) {
               $9.99
               <span className="ml-1 text-sm font-normal text-muted-foreground">one-time</span>
             </p>
-            <p className="mt-2 text-xs text-muted-foreground">Local on one device. No multi-device sync.</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              One device forever. You can upgrade to Sync later.
+            </p>
             <Button
               className="mt-4 w-full"
               variant="outline"

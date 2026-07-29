@@ -4,6 +4,7 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  CreditCard,
   Library,
   NotebookPen,
   StickyNote,
@@ -103,6 +104,29 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: 'plans',
+    title: 'Trial, Download & Sync',
+    icon: <CreditCard className="h-4 w-4" />,
+    steps: [
+      {
+        heading: 'Free trial (30 days)',
+        body: 'Create an account to start. Sync across every device you sign in on is included so you can see if you need more than one device.',
+      },
+      {
+        heading: 'After the trial',
+        body: 'Choose Download ($9.99 one-time) for one device forever, or Sync ($3.99/mo or $39.99/yr) to keep writing across devices. You can upgrade to Sync anytime after Download.',
+      },
+      {
+        heading: 'Export is always yours',
+        body: 'Save to Device, Share, Copy, Print, Export Entry, and full .notiebak backups work on trial, Download, and Sync. Your words are not locked to a plan.',
+      },
+      {
+        heading: 'Backup & restore',
+        body: 'Settings → Backup & export → Download backup creates an encrypted .notiebak file. Restore it on another install of Notie when you need a local safety copy.',
+      },
+    ],
+  },
+  {
     id: 'calendar',
     title: 'Calendar setup',
     icon: <Calendar className="h-4 w-4" />,
@@ -125,11 +149,7 @@ const SECTIONS: Section[] = [
       },
       {
         heading: 'Works on the free trial',
-        body: 'You do not need a paid plan to try calendar sync. Paste a Google, Apple, or Outlook ICS link and tap Sync now — no account required for those providers.',
-      },
-      {
-        heading: 'Sync on demand',
-        body: 'Hit Sync now any time. Your ICS URL is saved, so you only paste it once. School or work domains may need a free account and a one-click “Allow this source” the first time.',
+        body: 'Paste a Google, Apple, or Outlook ICS link and tap Sync now. School or work domains may need a one-click “Allow this source” the first time.',
       },
     ],
   },

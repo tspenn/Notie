@@ -20,9 +20,9 @@ export function toCloudUuid(id: string): string {
 export function planLabel(plan: PlanKey): string {
   switch (plan) {
     case 'trial':
-      return 'Free trial — 30 days';
+      return 'Free trial — Sync across devices for 30 days';
     case 'one_device':
-      return 'Download — $9.99 one-time';
+      return 'Download — $9.99 one-time (one device)';
     case 'cloud_sync':
       return 'Sync — $3.99/mo or $39.99/year';
     default:
@@ -30,9 +30,12 @@ export function planLabel(plan: PlanKey): string {
   }
 }
 
-/** Whether library data may sync to Supabase (multi-device). */
+/**
+ * Multi-device library sync is on for the free trial and paid Sync.
+ * Download (one_device) stays on this device only.
+ */
 export function canCloudSync(plan: PlanKey): boolean {
-  return plan === 'cloud_sync';
+  return plan === 'trial' || plan === 'cloud_sync';
 }
 
 function tierKeyToPlan(key: unknown, tierName: string | null | undefined): PlanKey | null {

@@ -1,17 +1,17 @@
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { localDb } from '@/lib/localDb';
 import { canCloudSync } from '@/lib/plan';
-import type { Entry, PlanKey, SavedItem } from '@/lib/types';
+import type { Entry, PlanKey, ProgressRow, SavedItem } from '@/lib/types';
 
 export type SyncResult = {
-  pushed: { notebooks: number; entries: number; savedItems: number };
-  pulled: { notebooks: number; entries: number; savedItems: number };
+  pushed: { notebooks: number; entries: number; savedItems: number; progress: number };
+  pulled: { notebooks: number; entries: number; savedItems: number; progress: number };
 };
 
 function emptyResult(): SyncResult {
   return {
-    pushed: { notebooks: 0, entries: 0, savedItems: 0 },
-    pulled: { notebooks: 0, entries: 0, savedItems: 0 },
+    pushed: { notebooks: 0, entries: 0, savedItems: 0, progress: 0 },
+    pulled: { notebooks: 0, entries: 0, savedItems: 0, progress: 0 },
   };
 }
 
@@ -22,8 +22,8 @@ export function adoptLocalLibrary(localUserId: string, cloudUserId: string): voi
 }
 
 /**
- * Bidirectional sync for Sync plan users.
- * Download / trial: no-op (library stays on-device only).
+ * Bidirectional sync for trial + paid Sync.
+ * Download (one_device): no-op — library stays on this device only.
  */
 export async function syncLibrary(opts: {
   cloudUserId: string;
@@ -35,12 +35,19 @@ export async function syncLibrary(opts: {
   localDb.normalizeIdsForCloud(userId);
   const result = emptyResult();
 
-  const [{ data: remoteNotebooks }, { data: remoteEntries }, { data: remoteSaved }] =
-    await Promise.all([
-      supabase.from('notie_notebooks').select('*').eq('user_id', userId),
-      supabase.from('notie_entries').select('*').eq('user_id', userId),
-      supabase.from('notie_saved_items').select('*').eq('user_id', userId),
-    ]);
+  const [
+    { data: remoteNotebooks },
+    { data: remoteEntries },
+    { data: remoteSaved },
+    { data: remoteProgress },
+    { data: remoteCategories },
+  ] = await Promise.all([
+    supabase.from('notie_notebooks').select('*').eq('user_id', userId),
+    supabase.from('notie_entries').select('*').eq('user_id', userId),
+    supabase.from('notie_saved_items').select('*').eq('user_id', userId),
+    supabase.from('notie_progress_rows').select('*').eq('user_id', userId),
+    supabase.from('notie_custom_categories').select('*').eq('user_id', userId),
+  ]);
 
   if (remoteNotebooks?.length) {
     for (const row of remoteNotebooks) {
@@ -93,6 +100,34 @@ export async function syncLibrary(opts: {
     }
   }
 
+  if (remoteProgress?.length) {
+    for (const row of remoteProgress) {
+      localDb.upsertProgressFromCloud({
+        id: row.id as string,
+        userId,
+        notebookId: row.notebook_id as string,
+        title: (row.title as string) || '',
+        summary: (row.summary as string) || '',
+        inspiration: (row.inspiration as string) || '',
+        investmentMinutes: Number(row.investment_minutes ?? 0) || 0,
+        entryId: (row.entry_id as string | null) ?? null,
+        createdAt: row.created_at as string,
+      });
+      result.pulled.progress += 1;
+    }
+  }
+
+  if (remoteCategories?.length) {
+    for (const row of remoteCategories) {
+      localDb.upsertCustomCategoryFromCloud({
+        id: row.id as string,
+        userId,
+        notebookId: row.notebook_id as string,
+        name: row.name as string,
+      });
+    }
+  }
+
   const notebooks = localDb.listNotebooks(userId, true);
   const notebookRows = notebooks.map((n) => ({
     id: n.id,
@@ -106,9 +141,7 @@ export async function syncLibrary(opts: {
   }));
 
   if (notebookRows.length) {
-    const { error } = await supabase.from('notie_notebooks').upsert(notebookRows, {
-      onConflict: 'id',
-    });
+    const { error } = await supabase.from('notie_notebooks').upsert(notebookRows, { onConflict: 'id' });
     if (!error) result.pushed.notebooks = notebookRows.length;
     else console.warn('[notie sync] notebooks', error.message);
   }
@@ -132,11 +165,30 @@ export async function syncLibrary(opts: {
   }));
 
   if (entryRows.length) {
-    const { error } = await supabase.from('notie_entries').upsert(entryRows, {
-      onConflict: 'id',
-    });
+    const { error } = await supabase.from('notie_entries').upsert(entryRows, { onConflict: 'id' });
     if (!error) result.pushed.entries = entryRows.length;
     else console.warn('[notie sync] entries', error.message);
+  }
+
+  const progress = localDb.listAllProgress(userId);
+  const progressRows = progress.map((p: ProgressRow) => ({
+    id: p.id,
+    user_id: userId,
+    notebook_id: p.notebookId,
+    title: p.title,
+    summary: p.summary,
+    inspiration: p.inspiration,
+    investment_minutes: p.investmentMinutes,
+    entry_id: p.entryId,
+    created_at: p.createdAt,
+  }));
+
+  if (progressRows.length) {
+    const { error } = await supabase.from('notie_progress_rows').upsert(progressRows, {
+      onConflict: 'id',
+    });
+    if (!error) result.pushed.progress = progressRows.length;
+    else console.warn('[notie sync] progress', error.message);
   }
 
   const saved = localDb.listAllSavedItems(userId);
@@ -154,11 +206,23 @@ export async function syncLibrary(opts: {
   }));
 
   if (savedRows.length) {
-    const { error } = await supabase.from('notie_saved_items').upsert(savedRows, {
-      onConflict: 'id',
-    });
+    const { error } = await supabase.from('notie_saved_items').upsert(savedRows, { onConflict: 'id' });
     if (!error) result.pushed.savedItems = savedRows.length;
     else console.warn('[notie sync] saved items', error.message);
+  }
+
+  const categories = localDb.listAllCustomCategories(userId);
+  if (categories.length) {
+    const { error } = await supabase.from('notie_custom_categories').upsert(
+      categories.map((c) => ({
+        id: c.id,
+        user_id: userId,
+        notebook_id: c.notebookId,
+        name: c.name,
+      })),
+      { onConflict: 'id' },
+    );
+    if (error) console.warn('[notie sync] categories', error.message);
   }
 
   return result;

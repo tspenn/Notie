@@ -15,9 +15,14 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ onSeePlans }: LandingPageProps) {
-  const { startLocal, mode } = useAuth();
+  const { mode } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
+
+  const beginFreeTrial = () => {
+    setAuthMode('signup');
+    setAuthOpen(true);
+  };
   const [syncCycle, setSyncCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [tierIds, setTierIds] = useState<Partial<Record<PlanKey, string>>>({});
   const [pendingCheckout, setPendingCheckout] = useState<{
@@ -85,10 +90,10 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
       <div className="relative border-b border-moss/20 bg-moss/10">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-1 px-5 py-3 text-center sm:flex-row sm:justify-between sm:px-8 sm:text-left">
           <p className="font-display text-sm font-medium text-foreground sm:text-base">
-            Try Notie free for 30 days — online, no download.
+            Try Notie free for 30 days — Sync across your devices.
           </p>
           <p className="text-xs text-muted-foreground sm:text-sm">
-            Then choose Download or Sync.
+            Then choose one device (Download) or keep Sync.
           </p>
         </div>
       </div>
@@ -121,7 +126,7 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
               Not just for notes!
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" onClick={() => startLocal()} disabled={busy}>
+              <Button size="lg" onClick={beginFreeTrial} disabled={busy}>
                 Try free for 30 days
               </Button>
               <Button
@@ -136,8 +141,8 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
               </Button>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
-              Free online trial on one device. No download required. After 30 days, pick Download
-              ($9.99) or Sync.
+              Create a free account and Sync across devices for 30 days. Then decide: one device
+              forever (Download, $9.99) or keep Sync.
             </p>
             <p className="mt-4 text-sm text-muted-foreground">
               All your writing in the same place. Notes, Lists, Ideas, Plans, Study
@@ -160,8 +165,8 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
             After your free trial
           </h2>
           <p className="mt-2 max-w-lg text-muted-foreground">
-            Try online for 30 days — then choose Download for one device, or Sync across all of
-            yours.
+            Do you want to use only one device, or access your writing across devices? You can
+            upgrade to Sync anytime — even after Download.
           </p>
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
@@ -172,7 +177,8 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
                 <span className="ml-1 text-base font-normal text-muted-foreground">one-time</span>
               </p>
               <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                Local on one device. No multi-device sync.
+                One device forever. Export anytime. Upgrade to Sync later if you need another
+                device.
               </p>
               <Button
                 className="mt-6 w-full"
@@ -185,7 +191,7 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
               <button
                 type="button"
                 className="mt-3 w-full text-center text-xs text-muted-foreground underline-offset-2 hover:underline"
-                onClick={() => startLocal()}
+                onClick={beginFreeTrial}
               >
                 or start your free 30-day trial
               </button>
@@ -216,7 +222,8 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
                 </button>
               </div>
               <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                Keep every notebook with you across devices.
+                Access your library across every device you sign in on. Included free during the
+                30-day trial.
               </p>
               <Button
                 className="mt-6 w-full"
