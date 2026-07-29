@@ -191,6 +191,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [mode, user?.id, plan]);
 
   const signIn = async (email: string, password: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error(
+        'Notie is not connected to the cloud yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Vercel, then redeploy.',
+      );
+    }
     const localId = localDb.getProfile()?.id ?? null;
     if (localId) priorLocalIdRef.current = localId;
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -198,6 +203,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, displayName?: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error(
+        'Notie is not connected to the cloud yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Vercel, then redeploy.',
+      );
+    }
     const localId = localDb.getProfile()?.id ?? null;
     if (localId) priorLocalIdRef.current = localId;
     const { data, error } = await supabase.auth.signUp({

@@ -106,13 +106,13 @@ export function Dashboard() {
         <div className="mx-auto flex min-h-16 max-w-6xl items-center gap-2 px-4 py-2 sm:px-6 md:min-h-[125px] md:gap-3 md:py-2">
           <NotieMark size="header" />
           <div className="min-w-0 flex-1">
-            <p className="notie-wordmark text-xl leading-none text-foreground md:text-3xl">
+            <p className="notie-wordmark text-2xl leading-none text-foreground md:text-4xl">
               Notie
             </p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground md:mt-1 md:text-sm">
+            <p className="mt-0.5 truncate text-sm text-muted-foreground md:mt-1 md:text-base">
               {displayName}
             </p>
-            <p className="mt-0.5 text-[10px] tracking-wide text-muted-foreground/80 md:mt-1 md:text-xs">
+            <p className="mt-0.5 text-xs tracking-wide text-muted-foreground/80 md:mt-1 md:text-sm">
               A Skyland Apps product
             </p>
           </div>
@@ -125,7 +125,7 @@ export function Dashboard() {
               navigateTo(searchLink().replace(/^#/, ''));
             }}
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-5 w-5" />
           </Button>
           <Button
             variant="ghost"
@@ -133,7 +133,7 @@ export function Dashboard() {
             aria-label="Archive"
             onClick={() => setArchiveOpen(true)}
           >
-            <Archive className="h-4 w-4" />
+            <Archive className="h-5 w-5" />
           </Button>
           <Button
             variant="ghost"
@@ -141,7 +141,7 @@ export function Dashboard() {
             aria-label="Settings"
             onClick={() => setSettingsOpen(true)}
           >
-            <Settings2 className="h-4 w-4" />
+            <Settings2 className="h-5 w-5" />
           </Button>
         </div>
       </header>
@@ -161,15 +161,15 @@ export function Dashboard() {
         >
           <TabsList className="mb-5">
             <TabsTrigger value="library" className="gap-1.5">
-              <LibraryIcon className="h-3.5 w-3.5" />
+              <LibraryIcon className="h-4 w-4" />
               Library
             </TabsTrigger>
             <TabsTrigger value="calendar" className="gap-1.5">
-              <CalendarDays className="h-3.5 w-3.5" />
+              <CalendarDays className="h-4 w-4" />
               Calendar
             </TabsTrigger>
             <TabsTrigger value="notes" className="gap-1.5">
-              <StickyNote className="h-3.5 w-3.5" />
+              <StickyNote className="h-4 w-4" />
               Note to self
             </TabsTrigger>
           </TabsList>

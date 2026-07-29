@@ -52,11 +52,20 @@
 
   html {
     @apply antialiased;
+    /* Larger base so rem-based UI (text-sm, text-xs, buttons) reads on phone and desktop. */
+    font-size: 18px;
+  }
+
+  @media (min-width: 768px) {
+    html {
+      font-size: 18px;
+    }
   }
 
   body {
-    @apply bg-background text-foreground font-body;
+    @apply bg-background text-foreground font-body text-base;
     min-height: 100dvh;
+    line-height: 1.55;
     /* Subtle paper texture: soft radial highlight + faint grain via layered gradients. */
     background-image:
       radial-gradient(ellipse 80% 60% at 15% 0%, rgba(111, 150, 142, 0.10), transparent 60%),

@@ -40,7 +40,7 @@ function BookBinding({ data, onOpen }: { data: NotebookShelfData; onOpen: () => 
   return (
     <div className="animate-shelf-in flex flex-col items-center">
       {data.previousEntry && (
-        <p className="mb-2 max-w-[4.5rem] px-0.5 text-center text-[10px] leading-snug text-muted-foreground">
+        <p className="mb-2 max-w-[5.5rem] px-0.5 text-center text-xs leading-snug text-muted-foreground">
           Previous:{' '}
           <span className="font-medium text-foreground">
             {data.previousEntry.title || 'Untitled'}
@@ -77,13 +77,14 @@ function BookBinding({ data, onOpen }: { data: NotebookShelfData; onOpen: () => 
           <div className="pointer-events-none absolute inset-x-1.5 bottom-3 h-px bg-black/20" />
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/25" />
 
-          {/* Project name on the binding — top to bottom */}
+          {/* Project name on the binding — top to bottom, letters upright */}
           <div className="absolute inset-0 flex items-center justify-center px-0.5 py-3">
             <span
-              className="max-h-full overflow-hidden text-ellipsis whitespace-nowrap font-display text-[10px] font-semibold tracking-wide text-sand drop-shadow-sm sm:text-[11px]"
+              className="max-h-full overflow-hidden text-ellipsis whitespace-nowrap font-display text-xs font-semibold capitalize tracking-wide text-sand drop-shadow-sm sm:text-sm"
               style={{
                 writingMode: 'vertical-rl',
                 textOrientation: 'mixed',
+                transform: 'rotate(180deg)',
               }}
             >
               {data.notebook.title}
@@ -126,7 +127,7 @@ export function Library({ userId, onOpenBook, refreshKey = 0 }: LibraryProps) {
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-2xl font-semibold text-foreground">Library</h2>
+          <h2 className="font-display text-3xl font-semibold text-foreground">Library</h2>
         </div>
         <Button onClick={() => setCreating(true)}>
           <Plus className="mr-1.5 h-4 w-4" />
