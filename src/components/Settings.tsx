@@ -89,8 +89,8 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
                 {mode === 'cloud'
                   ? user?.email
                   : plan === 'trial'
-                    ? 'Free trial — stored on this browser'
-                    : 'Download — stored on this browser only'}
+                    ? 'Free trial — on this device (sign in to Sync across devices)'
+                    : 'Download — on this device only'}
               </p>
             </section>
 
