@@ -27,7 +27,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
@@ -79,8 +78,9 @@ function itemToText(item: SavedItem, idx: number): string {
 }
 
 /**
- * Categories: Files, Gallery, Plans, Lists, To Do, plus custom.
- * Selected category shows Canvas-style actions (no Lab) in Notie colors.
+ * Notebook-scoped saved items: Files, Gallery, Plans, Lists, To Do, plus custom.
+ * Shared across all entries in this notebook; not shared across notebooks.
+ * No "Categories" heading — the pill labels are self-evident.
  */
 export function CategoriesPanel({
   userId,
@@ -90,7 +90,8 @@ export function CategoriesPanel({
 }: CategoriesPanelProps) {
   const [items, setItems] = useState<SavedItem[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
-  const [active, setActive] = useState<CategoryKey>('Files');
+  /** null = pills only; set when user opens a category to view saved items + actions */
+  const [openCategory, setOpenCategory] = useState<CategoryKey | null>(null);
   const [draft, setDraft] = useState('');
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -105,25 +106,38 @@ export function CategoriesPanel({
 
   useEffect(() => {
     refresh();
+    setOpenCategory(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notebookId, refreshKey]);
+  }, [notebookId]);
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [active]);
+    setDraft('');
+  }, [openCategory]);
 
   const categories: CategoryKey[] = [...DEFAULT_CATEGORIES, ...customCategories];
+  const active = openCategory;
   const itemsForActive = useMemo(
-    () => items.filter((i) => i.category === active),
+    () => (active ? items.filter((i) => i.category === active) : []),
     [items, active],
   );
   const selectedItems = useMemo(
     () => itemsForActive.filter((i) => selectedIds.has(i.id)),
     [itemsForActive, selectedIds],
   );
-  const isChecklist = CHECKABLE_CATEGORIES.has(active);
+  const isChecklist = Boolean(active && CHECKABLE_CATEGORIES.has(active));
   const isFileCategory = active === 'Files' || active === 'Gallery';
   const notebookTitle = localDb.getNotebook(notebookId)?.title ?? 'Notebook';
+
+  const toggleCategory = (cat: CategoryKey) => {
+    setOpenCategory((prev) => (prev === cat ? null : cat));
+    setAddingCategory(false);
+  };
 
   const actionBtn =
     'h-8 justify-start border-border bg-card text-[11px] text-moss hover:bg-moss/10 hover:text-moss';
@@ -270,14 +284,14 @@ export function CategoriesPanel({
 
   const sendToNotebook = (targetId: string) => {
     const list = requireSelection();
-    if (!list) return;
+    if (!list || !active) return;
     const target = otherNotebooks.find((n) => n.id === targetId);
     for (const item of list) {
       localDb.addSavedItem({
         userId,
         notebookId: targetId,
         entryId: null,
-        category: active,
+        category: item.category,
         content: item.content,
         contentType: item.contentType,
         contentData: item.contentData ?? null,
@@ -301,7 +315,7 @@ export function CategoriesPanel({
 
   const addItem = () => {
     const content = draft.trim();
-    if (!content) return;
+    if (!content || !active) return;
     localDb.addSavedItem({
       userId,
       notebookId,
@@ -330,6 +344,7 @@ export function CategoriesPanel({
   };
 
   const handleFile = (file: File) => {
+    if (!active) return;
     const isImage = file.type.startsWith('image/');
     const reader = new FileReader();
     reader.onload = () => {
@@ -353,239 +368,270 @@ export function CategoriesPanel({
     localDb.addCustomCategory(userId, notebookId, name);
     setNewCategoryName('');
     setAddingCategory(false);
-    setActive(name);
+    setOpenCategory(name);
     refresh();
   };
 
-  return (
-    <div className="flex h-full flex-col">
-      <Tabs
-        value={active}
-        onValueChange={(v) => setActive(v as CategoryKey)}
-        className="flex h-full flex-col"
-      >
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-          <TabsList className="h-auto flex-wrap justify-start gap-1 bg-transparent p-0">
-            {categories.map((cat) => (
-              <TabsTrigger
-                key={cat}
-                value={cat}
-                className="rounded-full border border-border bg-card px-3 py-1 text-xs data-[state=active]:border-moss data-[state=active]:bg-moss/10 data-[state=active]:text-moss data-[state=active]:shadow-none"
-              >
-                {cat}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <button
-            type="button"
-            onClick={() => setAddingCategory((v) => !v)}
-            title="Add category"
-            className="ml-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground hover:border-moss hover:text-moss"
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </button>
-        </div>
+  const countFor = (cat: CategoryKey) => items.filter((i) => i.category === cat).length;
 
-        {addingCategory && (
-          <div className="mt-2 flex items-center gap-2">
-            <Input
-              autoFocus
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              placeholder="New category name"
-              className="h-8 text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') createCategory();
-                if (e.key === 'Escape') setAddingCategory(false);
-              }}
-            />
-            <Button size="sm" onClick={createCategory}>
-              Add
+  return (
+    <div className="flex flex-col">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {categories.map((cat) => {
+          const count = countFor(cat);
+          const isOpen = openCategory === cat;
+          return (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => toggleCategory(cat)}
+              className={cn(
+                'rounded-full border px-3 py-1.5 text-xs transition',
+                isOpen
+                  ? 'border-moss bg-moss/10 text-moss'
+                  : 'border-border bg-card text-foreground hover:border-moss/50',
+              )}
+            >
+              {cat}
+              {count > 0 ? ` · ${count}` : ''}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => setAddingCategory((v) => !v)}
+          title="Add your own"
+          className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground hover:border-moss hover:text-moss"
+        >
+          <Plus className="h-3 w-3" />
+          More
+        </button>
+      </div>
+
+      {addingCategory && (
+        <div className="mt-2 flex items-center gap-2">
+          <Input
+            autoFocus
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            placeholder="Your category name"
+            className="h-8 text-sm"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') createCategory();
+              if (e.key === 'Escape') setAddingCategory(false);
+            }}
+          />
+          <Button size="sm" onClick={createCategory} disabled={!newCategoryName.trim()}>
+            Add
+          </Button>
+        </div>
+      )}
+
+      {active && (
+        <div className="mt-3 space-y-3 border-t border-border/70 pt-3">
+          <ScrollArea className="max-h-[32vh] pr-2">
+            <div className="space-y-1.5">
+              {itemsForActive.length === 0 && (
+                <p className="py-3 text-center text-xs text-muted-foreground">
+                  Nothing saved here yet. Highlight text while writing to add items.
+                </p>
+              )}
+              {itemsForActive.map((item) => {
+                const selected = selectedIds.has(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    className={cn(
+                      'group flex items-start gap-2 rounded-md border px-2.5 py-1.5',
+                      selected ? 'border-moss/50 bg-moss/5' : 'border-border/70 bg-card/60',
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleSelect(item.id)}
+                      className={cn(
+                        'mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
+                        selected
+                          ? 'border-moss bg-moss text-primary-foreground'
+                          : 'border-border bg-card',
+                      )}
+                      aria-label={selected ? 'Deselect' : 'Select'}
+                    >
+                      {selected && (
+                        <svg
+                          className="h-full w-full"
+                          fill="none"
+                          strokeWidth="3"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                    {isChecklist && (
+                      <Checkbox
+                        checked={item.completed}
+                        onCheckedChange={() => toggleComplete(item)}
+                        className="mt-0.5"
+                      />
+                    )}
+                    {item.contentType === 'image' ? (
+                      <a href={item.content} target="_blank" rel="noreferrer" className="flex-1">
+                        <img
+                          src={item.content}
+                          alt={String(item.contentData?.filename ?? 'image')}
+                          className="max-h-28 rounded-md border border-border object-cover"
+                        />
+                        <p className="mt-1 truncate text-[11px] text-muted-foreground">
+                          {String(item.contentData?.filename ?? '')}
+                        </p>
+                      </a>
+                    ) : item.contentType === 'file' ? (
+                      <a
+                        href={item.content}
+                        download={String(item.contentData?.filename ?? 'file')}
+                        className="flex flex-1 items-center gap-2 text-sm text-foreground hover:text-moss"
+                      >
+                        <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        <span className="truncate">
+                          {String(item.contentData?.filename ?? 'file')}
+                        </span>
+                      </a>
+                    ) : (
+                      <p
+                        className={cn(
+                          'flex-1 whitespace-pre-wrap text-sm',
+                          item.completed && 'text-muted-foreground line-through',
+                        )}
+                      >
+                        {item.content}
+                      </p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeItem(item.id)}
+                      className="mt-0.5 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+
+          <div className="space-y-1.5">
+            <p className="text-[10px] text-muted-foreground">
+              {selectedItems.length} of {itemsForActive.length} selected
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={selectAll}>
+                Select All
+              </Button>
+              <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={deselectAll}>
+                Deselect
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={actionBtn}
+                onClick={() => void shareSelected()}
+              >
+                <Share2 className="mr-1 h-3 w-3" />
+                Share
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={actionBtn}
+                onClick={() => void copySelected()}
+              >
+                <ClipboardCopy className="mr-1 h-3 w-3" />
+                Copy
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={actionBtn}
+                onClick={() => void copyNotebookLink()}
+              >
+                <Link2 className="mr-1 h-3 w-3" />
+                Copy link
+              </Button>
+              <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={printSelected}>
+                <Printer className="mr-1 h-3 w-3" />
+                Print
+              </Button>
+              <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={saveToDevice}>
+                <Download className="mr-1 h-3 w-3" />
+                Save to Device
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={actionBtn}
+                onClick={openSendToNotebook}
+              >
+                <FolderInput className="mr-1 h-3 w-3" />
+                Send to notebook…
+              </Button>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-full text-[11px] text-destructive hover:bg-destructive/10"
+              disabled={selectedItems.length === 0}
+              onClick={deleteSelected}
+            >
+              Delete Selected
             </Button>
           </div>
-        )}
 
-        {categories.map((cat) => (
-          <TabsContent key={cat} value={cat} className="mt-3 flex-1 overflow-hidden">
-            {/* Action toolbar — Notie colors, no Lab */}
-            <div className="mb-2 space-y-1.5">
-              <p className="text-[10px] text-muted-foreground">
-                {selectedItems.length} of {itemsForActive.length} selected
-              </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={selectAll}>
-                  Select All
-                </Button>
-                <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={deselectAll}>
-                  Deselect
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={() => void shareSelected()}>
-                  <Share2 className="mr-1 h-3 w-3" />
-                  Share
-                </Button>
-                <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={() => void copySelected()}>
-                  <ClipboardCopy className="mr-1 h-3 w-3" />
-                  Copy
-                </Button>
-                <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={() => void copyNotebookLink()}>
-                  <Link2 className="mr-1 h-3 w-3" />
-                  Copy link
-                </Button>
-                <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={printSelected}>
-                  <Printer className="mr-1 h-3 w-3" />
-                  Print
-                </Button>
-                <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={saveToDevice}>
-                  <Download className="mr-1 h-3 w-3" />
-                  Save to Device
-                </Button>
-                <Button type="button" variant="outline" size="sm" className={actionBtn} onClick={openSendToNotebook}>
-                  <FolderInput className="mr-1 h-3 w-3" />
-                  Send to notebook…
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="col-span-2 h-8 text-[11px] text-destructive hover:bg-destructive/10 sm:col-span-3"
-                  disabled={selectedItems.length === 0}
-                  onClick={deleteSelected}
-                >
-                  Delete Selected
-                </Button>
-              </div>
-            </div>
-
-            <ScrollArea className="h-full max-h-[28vh] pr-2">
-              <div className="space-y-1.5">
-                {itemsForActive.length === 0 && (
-                  <p className="py-4 text-center text-xs text-muted-foreground">
-                    Nothing saved here yet.
-                  </p>
+          <div className="flex items-center gap-2">
+            {isFileCategory ? (
+              <label className="flex h-9 flex-1 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground hover:border-moss hover:text-moss">
+                {active === 'Gallery' ? (
+                  <ImageIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <Paperclip className="h-3.5 w-3.5" />
                 )}
-                {itemsForActive.map((item) => {
-                  const selected = selectedIds.has(item.id);
-                  return (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        'group flex items-start gap-2 rounded-md border px-2.5 py-1.5',
-                        selected
-                          ? 'border-moss/50 bg-moss/5'
-                          : 'border-border/70 bg-card/60',
-                      )}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleSelect(item.id)}
-                        className={cn(
-                          'mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border',
-                          selected
-                            ? 'border-moss bg-moss text-primary-foreground'
-                            : 'border-border bg-card',
-                        )}
-                        aria-label={selected ? 'Deselect' : 'Select'}
-                      >
-                        {selected && (
-                          <svg className="h-full w-full" fill="none" strokeWidth="3" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </button>
-                      {isChecklist && (
-                        <Checkbox
-                          checked={item.completed}
-                          onCheckedChange={() => toggleComplete(item)}
-                          className="mt-0.5"
-                        />
-                      )}
-                      {item.contentType === 'image' ? (
-                        <a href={item.content} target="_blank" rel="noreferrer" className="flex-1">
-                          <img
-                            src={item.content}
-                            alt={String(item.contentData?.filename ?? 'image')}
-                            className="max-h-28 rounded-md border border-border object-cover"
-                          />
-                          <p className="mt-1 truncate text-[11px] text-muted-foreground">
-                            {String(item.contentData?.filename ?? '')}
-                          </p>
-                        </a>
-                      ) : item.contentType === 'file' ? (
-                        <a
-                          href={item.content}
-                          download={String(item.contentData?.filename ?? 'file')}
-                          className="flex flex-1 items-center gap-2 text-sm text-foreground hover:text-moss"
-                        >
-                          <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          <span className="truncate">
-                            {String(item.contentData?.filename ?? 'file')}
-                          </span>
-                        </a>
-                      ) : (
-                        <p
-                          className={cn(
-                            'flex-1 whitespace-pre-wrap text-sm',
-                            item.completed && 'text-muted-foreground line-through',
-                          )}
-                        >
-                          {item.content}
-                        </p>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.id)}
-                        className="mt-0.5 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-
-            <div className="mt-2 flex items-center gap-2">
-              {isFileCategory ? (
-                <label className="flex h-9 flex-1 cursor-pointer items-center gap-2 rounded-md border border-dashed border-border px-3 text-xs text-muted-foreground hover:border-moss hover:text-moss">
-                  {active === 'Gallery' ? (
-                    <ImageIcon className="h-3.5 w-3.5" />
-                  ) : (
-                    <Paperclip className="h-3.5 w-3.5" />
-                  )}
-                  Attach {active === 'Gallery' ? 'an image' : 'a file'}
-                  <input
-                    type="file"
-                    accept={active === 'Gallery' ? 'image/*' : undefined}
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFile(file);
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-              ) : (
-                <>
-                  <Input
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder={isChecklist ? 'Add an item…' : `Add to ${active}…`}
-                    className="h-9 text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') addItem();
-                    }}
-                  />
-                  <Button size="sm" onClick={addItem} disabled={!draft.trim()}>
-                    <Plus className="h-3.5 w-3.5" />
-                  </Button>
-                </>
-              )}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+                Attach {active === 'Gallery' ? 'an image' : 'a file'}
+                <input
+                  type="file"
+                  accept={active === 'Gallery' ? 'image/*' : undefined}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFile(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            ) : (
+              <>
+                <Input
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder={isChecklist ? 'Add an item…' : `Add to ${active}…`}
+                  className="h-9 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') addItem();
+                  }}
+                />
+                <Button size="sm" onClick={addItem} disabled={!draft.trim()}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
         <DialogContent className="max-w-sm">

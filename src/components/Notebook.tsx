@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, BookOpen, Clock, Download, Save, X } from 'lucide-react';
+import { ArrowLeft, Download, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,7 +13,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { RichEditor } from '@/components/RichEditor';
 import { CategoriesPanel } from '@/components/CategoriesPanel';
-import { ReadingLamp } from '@/components/ReadingLamp';
 import { SelectionActionDialog } from '@/components/SelectionActionDialog';
 import { NotieMark } from '@/components/NotieMark';
 
@@ -30,11 +29,11 @@ interface NotebookProps {
 const AUTOSAVE_DELAY_MS = 700;
 
 /**
- * Notebook = Canvas WorkZone (AI stripped).
- * - loadOrCreateOpenEntry on open
- * - draft autosave while writing (does NOT finish an Entry / does NOT finalize progress)
- * - Save Entry archives + writes progress ledger (advances Library bars)
- * - Close returns to Library without finishing the open entry
+ * Notebook = writing surface for one book.
+ * - Draft autosave while writing
+ * - Save Entry archives + advances Library progress
+ * - Categories card below writing: notebook-scoped (shared across entries in this book only)
+ * - Past Entries live on Entry List, not here
  */
 export function Notebook({
   userId,
@@ -46,8 +45,6 @@ export function Notebook({
   const { syncNow } = useAuth();
   const [notebook, setNotebook] = useState<NotebookMeta | null>(null);
   const [entry, setEntry] = useState<Entry | null>(null);
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [sidebarTab, setSidebarTab] = useState<'categories' | 'history'>('categories');
   const [viewingEntry, setViewingEntry] = useState<Entry | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
@@ -65,10 +62,6 @@ export function Notebook({
     entryRef.current = entry;
   }, [entry]);
 
-  const refreshHistory = useCallback(() => {
-    setEntries(localDb.listEntries(notebookId));
-  }, [notebookId]);
-
   const loadOpen = useCallback(() => {
     loadingRef.current = true;
     const nb = localDb.getNotebook(notebookId);
@@ -79,9 +72,8 @@ export function Notebook({
     }
     const open = localDb.loadOrCreateOpenEntry(userId, notebookId);
     setEntry(open);
-    refreshHistory();
     loadingRef.current = false;
-  }, [notebookId, userId, refreshHistory]);
+  }, [notebookId, userId]);
 
   useEffect(() => {
     loadOpen();
@@ -146,7 +138,6 @@ export function Notebook({
       return;
     }
 
-    // Flush latest draft into the open entry first.
     flushDraft();
     setSavingEntry(true);
 
@@ -169,7 +160,6 @@ export function Notebook({
 
     toast.success('Entry saved');
     setEntry(result.nextOpen);
-    refreshHistory();
     onEntrySaved?.();
     void syncNow();
   };
@@ -194,7 +184,6 @@ export function Notebook({
     if (!reopened) return;
     setViewingEntry(null);
     setEntry(reopened);
-    refreshHistory();
     toast.message('Entry reopened for editing');
   };
 
@@ -216,8 +205,8 @@ export function Notebook({
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-background">
-      <header className="flex items-center gap-3 border-b border-border bg-card/70 px-4 py-3 backdrop-blur-sm sm:px-6">
-        <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Back to Library">
+      <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card/70 px-4 py-3 backdrop-blur-sm sm:px-6">
+        <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Back to entries">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <NotieMark size="sm" />
@@ -262,7 +251,7 @@ export function Notebook({
       </header>
 
       {previousEntry && (
-        <div className="border-b border-border/60 bg-secondary/30 px-4 py-1.5 text-xs text-muted-foreground sm:px-6">
+        <div className="shrink-0 border-b border-border/60 bg-secondary/30 px-4 py-1.5 text-xs text-muted-foreground sm:px-6">
           Previous entry:{' '}
           <button
             type="button"
@@ -275,112 +264,40 @@ export function Notebook({
         </div>
       )}
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4 sm:flex-row sm:p-6">
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Input
-            value={entry.title}
-            onChange={(e) => scheduleDraft({ title: e.target.value })}
-            placeholder="Entry title"
-            className="mb-3 h-10 border-none bg-transparent px-1 font-display text-xl font-semibold shadow-none focus-visible:ring-0"
-          />
-          <ScrollArea className="flex-1 rounded-lg border border-border bg-card/50 px-4 py-3">
-            <RichEditor
-              content={entry.content}
-              onChange={(html) => scheduleDraft({ content: html })}
-              onTextSelected={(text) => {
-                setSelectedText(text);
-                setSelectionOpen(true);
-              }}
-              toolbarTrailing={
-                <div className="flex min-w-[11rem] max-w-[16rem] items-center gap-2">
-                  <ReadingLamp size={22} alt="" />
-                  <div className="min-w-0 flex-1">
-                    <label className="mb-0.5 block text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                      Inspiration
-                    </label>
-                    <Input
-                      value={entry.inspiration}
-                      placeholder="A line to return to"
-                      onChange={(e) => scheduleDraft({ inspiration: e.target.value })}
-                      onBlur={(e) => {
-                        const value = e.target.value;
-                        flushDraft({ inspiration: value });
-                        localDb.setInspiration(notebookId, value);
-                      }}
-                      className="h-7 border-none bg-secondary/40 px-1.5 text-xs shadow-none focus-visible:ring-1"
-                    />
-                  </div>
-                </div>
-              }
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-4 sm:px-6 sm:py-6">
+          <div className="flex min-h-[min(62vh,36rem)] flex-col">
+            <Input
+              value={entry.title}
+              onChange={(e) => scheduleDraft({ title: e.target.value })}
+              placeholder="Entry title"
+              className="mb-3 h-10 border-none bg-transparent px-1 font-display text-xl font-semibold shadow-none focus-visible:ring-0"
             />
-          </ScrollArea>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            Draft autosaves while you write. Use Save Entry when this block of writing is finished —
-            that adds it to history and fills the Library book.
-          </p>
-        </div>
-
-        <div className="flex w-full flex-col sm:w-[340px] sm:shrink-0">
-          <div className="mb-2 flex gap-1 rounded-lg bg-secondary/50 p-1">
-            <button
-              type="button"
-              onClick={() => setSidebarTab('categories')}
-              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                sidebarTab === 'categories' ? 'bg-card text-moss shadow-sm' : 'text-muted-foreground'
-              }`}
-            >
-              Categories
-            </button>
-            <button
-              type="button"
-              onClick={() => setSidebarTab('history')}
-              className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
-                sidebarTab === 'history' ? 'bg-card text-moss shadow-sm' : 'text-muted-foreground'
-              }`}
-            >
-              Past Entries
-            </button>
+            <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card/50 px-3 py-3 sm:px-4">
+              <RichEditor
+                className="flex min-h-[min(52vh,30rem)] flex-1 flex-col"
+                content={entry.content}
+                onChange={(html) => scheduleDraft({ content: html })}
+                onTextSelected={(text) => {
+                  setSelectedText(text);
+                  setSelectionOpen(true);
+                }}
+              />
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Draft autosaves while you write. Use Save Entry when this block of writing is finished —
+              that adds it to history and fills the Library book.
+            </p>
           </div>
 
-          <div className="flex-1 overflow-hidden rounded-lg border border-border bg-card/50 p-3">
-            {sidebarTab === 'categories' ? (
-              <CategoriesPanel
-                userId={userId}
-                notebookId={notebookId}
-                entryId={entry.id}
-                refreshKey={categoriesRefreshKey}
-              />
-            ) : (
-              <ScrollArea className="h-full max-h-[55vh]">
-                <div className="space-y-1.5">
-                  {entries.filter((e) => e.isArchived).length === 0 && (
-                    <p className="py-4 text-center text-xs text-muted-foreground">
-                      No saved Entries yet — drafts stay open until you Save Entry.
-                    </p>
-                  )}
-                  {entries
-                    .filter((e) => e.isArchived)
-                    .map((e) => (
-                      <button
-                        key={e.id}
-                        type="button"
-                        onClick={() => setViewingEntry(e)}
-                        className="flex w-full flex-col items-start rounded-md border border-border/70 bg-card px-3 py-2 text-left hover:border-moss/50"
-                      >
-                        <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                          <BookOpen className="h-3.5 w-3.5 text-moss-soft" />
-                          {e.title || 'Untitled'}
-                        </span>
-                        <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {formatShortDate(e.updatedAt)}
-                          {e.writingMinutes > 0 ? ` · ${Math.round(e.writingMinutes)}m` : ''}
-                        </span>
-                      </button>
-                    ))}
-                </div>
-              </ScrollArea>
-            )}
+          {/* Notebook-scoped category items — shared across entries in this book only */}
+          <div className="rounded-xl border border-border bg-card/70 p-4 shadow-sm">
+            <CategoriesPanel
+              userId={userId}
+              notebookId={notebookId}
+              entryId={null}
+              refreshKey={categoriesRefreshKey}
+            />
           </div>
         </div>
       </div>
@@ -390,12 +307,9 @@ export function Notebook({
         selectedText={selectedText}
         userId={userId}
         notebookId={notebookId}
-        entryId={entry.id}
+        entryId={null}
         onOpenChange={setSelectionOpen}
-        onSaved={() => {
-          setCategoriesRefreshKey((k) => k + 1);
-          setSidebarTab('categories');
-        }}
+        onSaved={() => setCategoriesRefreshKey((k) => k + 1)}
       />
 
       <Dialog open={!!viewingEntry} onOpenChange={(open) => !open && setViewingEntry(null)}>

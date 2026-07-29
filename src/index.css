@@ -199,6 +199,19 @@
   pointer-events: none;
 }
 
+/* TipTap needs a real writing surface — empty docs otherwise collapse to a thin line */
+.notie-prose .tiptap,
+.notie-prose.ProseMirror,
+.notie-prose .ProseMirror {
+  min-height: min(48vh, 28rem);
+  outline: none;
+}
+.notie-prose .tiptap p,
+.notie-prose.ProseMirror p,
+.notie-prose .ProseMirror p {
+  min-height: 1.5em;
+}
+
 /* react-big-calendar restyle for the sea-glass palette */
 .notie-calendar {
   --rbc-border: hsl(var(--border));

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Mail, Tags } from 'lucide-react';
+import { Mail, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { localDb } from '@/lib/localDb';
 import { CHECKABLE_CATEGORIES, DEFAULT_CATEGORIES, type CategoryKey } from '@/lib/types';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -24,8 +24,8 @@ interface SelectionActionDialogProps {
 }
 
 /**
- * Opens when the writer highlights text in Notebook.
- * Choose a category to save into, or Share via email (body = selection).
+ * Highlight text in Notebook → pick Files / Gallery / Plans / Lists / To Do / +More.
+ * One tap saves into that notebook-scoped category and returns to writing.
  */
 export function SelectionActionDialog({
   open,
@@ -37,13 +37,15 @@ export function SelectionActionDialog({
   onSaved,
 }: SelectionActionDialogProps) {
   const [categories, setCategories] = useState<CategoryKey[]>([...DEFAULT_CATEGORIES]);
-  const [picked, setPicked] = useState<CategoryKey | null>(null);
+  const [addingMore, setAddingMore] = useState(false);
+  const [newName, setNewName] = useState('');
 
   useEffect(() => {
     if (!open) return;
     const custom = localDb.listCustomCategories(notebookId).map((c) => c.name);
     setCategories([...DEFAULT_CATEGORIES, ...custom]);
-    setPicked(null);
+    setAddingMore(false);
+    setNewName('');
   }, [open, notebookId]);
 
   const text = selectedText.trim();
@@ -82,10 +84,16 @@ export function SelectionActionDialog({
     onOpenChange(false);
   };
 
+  const saveToNewCategory = () => {
+    const name = newName.trim();
+    if (!name) return;
+    localDb.addCustomCategory(userId, notebookId, name);
+    saveToCategory(name);
+  };
+
   const shareEmail = () => {
     if (!text) return;
-    const href = `mailto:?body=${encodeURIComponent(text)}`;
-    window.location.href = href;
+    window.location.href = `mailto:?body=${encodeURIComponent(text)}`;
     onOpenChange(false);
   };
 
@@ -93,60 +101,62 @@ export function SelectionActionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display">Selected text</DialogTitle>
+          <DialogTitle className="font-display">Save selection</DialogTitle>
         </DialogHeader>
 
         <p className="rounded-md bg-secondary/50 px-3 py-2 text-sm leading-relaxed text-foreground">
           “{preview}”
         </p>
 
-        <div className="space-y-2">
-          <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            <Tags className="h-3.5 w-3.5" />
-            Save to category
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setPicked(cat)}
-                className={`rounded-full border px-3 py-1 text-xs transition ${
-                  picked === cat
-                    ? 'border-moss bg-moss/10 text-moss'
-                    : 'border-border bg-card text-foreground hover:border-moss/50'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-1.5">
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => saveToCategory(cat)}
+              className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-foreground transition hover:border-moss hover:bg-moss/10 hover:text-moss"
+            >
+              {cat}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setAddingMore((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground transition hover:border-moss hover:text-moss"
+          >
+            <Plus className="h-3 w-3" />
+            More
+          </button>
         </div>
 
-        <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
-          <Button type="button" variant="outline" onClick={shareEmail} className="w-full sm:w-auto">
-            <Mail className="mr-1.5 h-3.5 w-3.5" />
-            Share
-          </Button>
-          <div className="flex w-full gap-2 sm:w-auto">
-            <Button
-              type="button"
-              variant="ghost"
-              className="flex-1 sm:flex-none"
-              onClick={() => onOpenChange(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="flex-1 sm:flex-none"
-              disabled={!picked}
-              onClick={() => picked && saveToCategory(picked)}
-            >
+        {addingMore && (
+          <div className="flex items-center gap-2">
+            <Input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Your category name"
+              className="h-9 text-sm"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveToNewCategory();
+                if (e.key === 'Escape') setAddingMore(false);
+              }}
+            />
+            <Button size="sm" disabled={!newName.trim()} onClick={saveToNewCategory}>
               Save
             </Button>
           </div>
-        </DialogFooter>
+        )}
+
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <Button type="button" variant="outline" size="sm" onClick={shareEmail}>
+            <Mail className="mr-1.5 h-3.5 w-3.5" />
+            Share
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

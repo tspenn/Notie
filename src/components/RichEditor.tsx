@@ -66,7 +66,7 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
       editable,
       editorProps: {
         attributes: {
-          class: 'notie-prose focus:outline-none min-h-[280px] px-1 py-2',
+          class: 'notie-prose focus:outline-none min-h-[min(48vh,28rem)] px-1 py-2',
         },
       },
       onUpdate: ({ editor }) => {
@@ -204,7 +204,9 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
             ) : null}
           </div>
         )}
-        <EditorContent editor={editor} />
+        <div className="min-h-0 flex-1">
+          <EditorContent editor={editor} />
+        </div>
       </div>
     );
   },
