@@ -549,9 +549,10 @@ export const localDb = {
   },
 
   /**
-   * Save Entry (= Canvas Save Session).
-   * Archives the open entry, writes a progress ledger row (advances Library bar),
-   * opens a fresh entry carrying Inspiration forward.
+   * Save Tab (= Canvas Save Session).
+   * Archives the open page into the notebook's tab list, writes progress (Library bar),
+   * opens a fresh blank page carrying Inspiration forward.
+   * Draft autosave is separate — use saveOpenEntryDraft / writeDraft until this runs.
    */
   saveEntry(entryId: string): { archived: Entry; nextOpen: Entry } | null {
     const store = read();
@@ -570,7 +571,7 @@ export const localDb = {
     entry.isArchived = true;
     entry.updatedAt = nowIso();
     if (!entry.title.trim()) {
-      entry.title = `Entry — ${new Date().toLocaleDateString()}`;
+      entry.title = `Tab — ${new Date().toLocaleDateString()}`;
     }
 
     const progress: ProgressRow = {

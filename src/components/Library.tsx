@@ -41,7 +41,7 @@ function BookBinding({ data, onOpen }: { data: NotebookShelfData; onOpen: () => 
     <div className="animate-shelf-in flex flex-col items-center">
       {data.previousEntry && (
         <p className="mb-2 max-w-[5.5rem] px-0.5 text-center text-xs leading-snug text-muted-foreground">
-          Previous:{' '}
+          Previous tab:{' '}
           <span className="font-medium text-foreground">
             {data.previousEntry.title || 'Untitled'}
           </span>
@@ -140,7 +140,7 @@ export function Library({ userId, onOpenBook, refreshKey = 0 }: LibraryProps) {
           <ReadingLamp size={48} />
           <p className="mt-4 font-display text-lg text-foreground">The shelf is empty, for now.</p>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Start a notebook for a writing project. Save Entry when a block of writing is finished —
+            Start a notebook for a writing project. Save Tab when a full page is ready for your list —
             the binding on the shelf shows Growth.
           </p>
           <Button className="mt-5" onClick={() => setCreating(true)}>

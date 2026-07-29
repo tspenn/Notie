@@ -42,30 +42,30 @@ const SECTIONS: Section[] = [
     steps: [
       {
         heading: 'Your shelf of notebooks',
-        body: 'Each binding on the shelf is a writing project, with its name on the spine. Growth shows as the binding gets taller. Tap a book to open its Entry List.',
+        body: 'Each binding on the shelf is a writing project, with its name on the spine. Growth shows as the binding gets taller. Tap a book to open its Tabs list.',
       },
       {
-        heading: 'Previous entry',
-        body: 'Above each book you may see “Previous entry: [title] — [date]” so you can see the last finished writing block at a glance.',
+        heading: 'Previous tab',
+        body: 'Above each book you may see “Previous tab: [title] — [date]” so you can see the last finished page at a glance.',
       },
     ],
   },
   {
     id: 'entries',
-    title: 'Entry List',
+    title: 'Tabs',
     icon: <BookOpen className="h-4 w-4" />,
     steps: [
       {
-        heading: 'Saved entries',
-        body: 'After you open a book, you see past Entries — each with a title, date, and a short summary (~150 characters). Tap an Entry to open it in the Notebook.',
+        heading: 'Saved tabs',
+        body: 'After you open a book, you see saved Tabs — full pages with a title, date, and short summary. Tap a tab to open it and keep editing.',
       },
       {
         heading: 'Inspiration',
-        body: 'On the Entry List, the reading lamp and Inspiration field sit to the right. Inspiration is your short note — you write it; it is never AI-generated.',
+        body: 'On the Tabs page, the reading lamp and Inspiration field sit to the right. Inspiration is your short note — you write it; it is never AI-generated.',
       },
       {
-        heading: 'Open notebook',
-        body: 'Use Open notebook to enter the current writing space and keep drafting. Save Entry when a block of writing is finished.',
+        heading: 'Continue writing',
+        body: 'Open the current draft page anytime. Everything autosaves until you use Save Tab to add a finished page to this list.',
       },
     ],
   },
@@ -79,12 +79,12 @@ const SECTIONS: Section[] = [
         body: 'The Notebook is where essays, journaling, Bible study, and novel notes live. Write freely with formatting, images, and files.',
       },
       {
-        heading: 'Entries (not sessions)',
-        body: 'Draft while you write. Save Entry when finished — that moves it into history and grows the book on the Library shelf.',
+        heading: 'Autosave, Save, and Save Tab',
+        body: 'Your draft autosaves and survives leaving or closing the app. Header Save confirms this page so you can reopen and edit further. Save Tab (at the bottom) adds the whole page to your tab list and starts a fresh blank page.',
       },
       {
         heading: 'Categories',
-        body: 'Save snippets into Files, Gallery, Plans, Lists, To Do, or your own categories — a quick-reference panel beside your writing.',
+        body: 'Highlight text to save into Files, Gallery, Plans, Lists, To Do, or your own categories — a card below your writing, shared across tabs in this notebook only.',
       },
     ],
   },
@@ -95,7 +95,7 @@ const SECTIONS: Section[] = [
     steps: [
       {
         heading: 'Inspiration field',
-        body: 'A short, editable note on the Entry List (and in the Notebook toolbar) — a theme, verse, or line you want nearby while you write.',
+        body: 'A short, editable note on the Tabs page — a theme, verse, or line you want nearby while you write.',
       },
       {
         heading: 'Global search',
@@ -118,7 +118,7 @@ const SECTIONS: Section[] = [
       },
       {
         heading: 'Export is always yours',
-        body: 'Save to Device, Share, Copy, Print, Export Entry, and full .notiebak backups work on trial, Download, and Sync. Your words are not locked to a plan.',
+        body: 'Save to Device, Share, Copy, Print, Export, and full .notiebak backups work on trial, Download, and Sync. Your words are not locked to a plan.',
       },
       {
         heading: 'Backup & restore',
@@ -174,8 +174,8 @@ const SECTIONS: Section[] = [
     icon: <BookOpen className="h-4 w-4" />,
     steps: [
       {
-        heading: 'One entry per writing block',
-        body: 'Start a new Entry each time you sit down. The title becomes your log — “Morning pages”, “Chapter 4”, “Study notes”.',
+        heading: 'One tab per full page',
+        body: 'Each tab is a whole page of ideas, plans, or script — not a single sentence. Title it clearly — “Morning pages”, “Chapter 4”, “Study notes”.',
       },
       {
         heading: 'Categories as a second brain',

@@ -19,21 +19,20 @@ import { NotieMark } from '@/components/NotieMark';
 interface NotebookProps {
   userId: string;
   notebookId: string;
-  /** Open a specific historical entry read-only on mount (deep link). */
+  /** Open a specific saved tab for editing on mount (deep link). */
   initialEntryId?: string;
   onClose: () => void;
-  /** Fired after Save Entry so Library bars can refresh. */
+  /** Fired after Save Tab so Library bars can refresh. */
   onEntrySaved?: () => void;
 }
 
 const AUTOSAVE_DELAY_MS = 700;
 
 /**
- * Notebook = writing surface for one book.
- * - Draft autosave while writing
- * - Save Entry archives + advances Library progress
- * - Categories card below writing: notebook-scoped (shared across entries in this book only)
- * - Past Entries live on Entry List, not here
+ * Notebook writing surface.
+ * - Draft autosaves continuously and survives back / close / reload until Save Tab
+ * - Header Save: explicit persist of this page so you can leave and keep editing
+ * - Bottom Save Tab: add this full page to the notebook's tab list, then open a fresh page
  */
 export function Notebook({
   userId,
@@ -48,7 +47,7 @@ export function Notebook({
   const [viewingEntry, setViewingEntry] = useState<Entry | null>(null);
   const [renaming, setRenaming] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
-  const [savingEntry, setSavingEntry] = useState(false);
+  const [savingTab, setSavingTab] = useState(false);
   const [draftHint, setDraftHint] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [selectedText, setSelectedText] = useState('');
   const [selectionOpen, setSelectionOpen] = useState(false);
@@ -56,63 +55,102 @@ export function Notebook({
 
   const saveTimer = useRef<number | null>(null);
   const entryRef = useRef<Entry | null>(null);
+  /** Accumulates edits synchronously so Back/hide never loses keystrokes waiting on React or the debounce. */
+  const pendingPatchRef = useRef<Partial<Pick<Entry, 'title' | 'content' | 'inspiration'>>>({});
   const loadingRef = useRef(true);
 
   useEffect(() => {
     entryRef.current = entry;
   }, [entry]);
 
+  const flushDraft = useCallback(() => {
+    const current = entryRef.current;
+    if (!current || current.isArchived) return;
+    const pending = pendingPatchRef.current;
+    pendingPatchRef.current = {};
+    const next = {
+      title: pending.title ?? current.title,
+      content: pending.content ?? current.content,
+      inspiration: pending.inspiration ?? current.inspiration,
+    };
+    // Keep ref in sync immediately (Back can fire before the next render).
+    entryRef.current = { ...current, ...next };
+    localDb.saveOpenEntryDraft(current.id, next);
+    localDb.writeDraft(userId, notebookId, current.id, next);
+    setDraftHint('saved');
+  }, [userId, notebookId]);
+
   const loadOpen = useCallback(() => {
     loadingRef.current = true;
+    pendingPatchRef.current = {};
     const nb = localDb.getNotebook(notebookId);
     setNotebook(nb);
     if (!nb) {
       loadingRef.current = false;
       return;
     }
+
+    if (initialEntryId) {
+      const found = localDb.getEntry(initialEntryId);
+      if (found?.notebookId === notebookId) {
+        const working = found.isArchived ? localDb.reopenEntry(found.id) : found;
+        if (working) {
+          entryRef.current = working;
+          setEntry(working);
+          loadingRef.current = false;
+          return;
+        }
+      }
+    }
+
     const open = localDb.loadOrCreateOpenEntry(userId, notebookId);
+    entryRef.current = open;
     setEntry(open);
     loadingRef.current = false;
-  }, [notebookId, userId]);
+  }, [notebookId, userId, initialEntryId]);
 
   useEffect(() => {
     loadOpen();
-    if (initialEntryId) {
-      const found = localDb.getEntry(initialEntryId);
-      if (found?.isArchived && found.notebookId === notebookId) {
-        setViewingEntry(found);
+  }, [loadOpen]);
+
+  // Persist draft on leave / hide / unload — not only on the debounced timer.
+  useEffect(() => {
+    const persist = () => {
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+        saveTimer.current = null;
       }
-    }
-  }, [loadOpen, initialEntryId, notebookId]);
+      flushDraft();
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') persist();
+    };
+    window.addEventListener('pagehide', persist);
+    window.addEventListener('beforeunload', persist);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('pagehide', persist);
+      window.removeEventListener('beforeunload', persist);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [flushDraft]);
 
   const previousEntry = useMemo(
     () => (entry ? localDb.getPreviousEntry(notebookId, entry.id) : null),
     [notebookId, entry],
   );
 
-  const flushDraft = useCallback(
-    (patch?: Partial<Pick<Entry, 'title' | 'content' | 'inspiration'>>) => {
-      const current = entryRef.current;
-      if (!current || current.isArchived) return;
-      const next = {
-        title: patch?.title ?? current.title,
-        content: patch?.content ?? current.content,
-        inspiration: patch?.inspiration ?? current.inspiration,
-      };
-      localDb.saveOpenEntryDraft(current.id, next);
-      localDb.writeDraft(userId, notebookId, current.id, next);
-      setDraftHint('saved');
-    },
-    [userId, notebookId],
-  );
-
   const scheduleDraft = (patch: Partial<Pick<Entry, 'title' | 'content' | 'inspiration'>>) => {
     if (!entry || loadingRef.current) return;
+    pendingPatchRef.current = { ...pendingPatchRef.current, ...patch };
+    if (entryRef.current) {
+      entryRef.current = { ...entryRef.current, ...patch };
+    }
     setEntry((prev) => (prev ? { ...prev, ...patch } : prev));
     setDraftHint('saving');
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
-      flushDraft(patch);
+      flushDraft();
     }, AUTOSAVE_DELAY_MS);
   };
 
@@ -122,69 +160,100 @@ export function Notebook({
   });
 
   const handleBack = () => {
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
     flushDraft();
-    localDb.closeNotebookWithoutSaving(entry?.id ?? '');
+    localDb.closeNotebookWithoutSaving(entryRef.current?.id ?? entry?.id ?? '');
     onClose();
   };
 
-  const handleSaveEntry = () => {
-    if (!entry || savingEntry) return;
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+  /** Explicit save of this page — stays open for more editing. */
+  const handleSave = () => {
+    if (!entry) return;
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    flushDraft();
+    setDraftHint('saved');
+    toast.success('Saved', {
+      description: 'This page stays here — come back anytime to keep writing.',
+    });
+    void syncNow();
+  };
 
-    const plain = stripHtml(entry.content).trim();
-    if (!plain && !entry.title.trim()) {
-      toast.message('Write something before saving an Entry');
-      return;
+  /** Finish this page into the notebook's tab list; open a fresh blank page. */
+  const handleSaveTab = () => {
+    if (!entry || savingTab) return;
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
     }
 
     flushDraft();
-    setSavingEntry(true);
+    const latest = entryRef.current ?? entry;
+    const plain = stripHtml(latest.content).trim();
+    if (!plain && !latest.title.trim()) {
+      toast.message('Write something before saving this tab');
+      return;
+    }
 
-    let working = localDb.getEntry(entry.id) ?? entry;
+    setSavingTab(true);
+
+    let working = localDb.getEntry(latest.id) ?? latest;
     if (!working.title.trim()) {
       const firstLine = plain.split('\n').find((l) => l.trim())?.trim() || '';
       const autoTitle =
         firstLine.slice(0, 60) ||
-        `Entry — ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+        `Tab — ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
       localDb.saveOpenEntryDraft(working.id, { title: autoTitle });
       working = { ...working, title: autoTitle };
     }
 
     const result = localDb.saveEntry(working.id);
-    setSavingEntry(false);
+    setSavingTab(false);
     if (!result) {
-      toast.error('Could not save Entry');
+      toast.error('Could not save tab');
       return;
     }
 
-    toast.success('Entry saved');
+    toast.success('Tab saved', {
+      description: 'Added to this notebook’s tab list. A new page is ready.',
+    });
+    pendingPatchRef.current = {};
     setEntry(result.nextOpen);
+    setDraftHint('idle');
     onEntrySaved?.();
     void syncNow();
   };
 
-  const exportEntry = () => {
+  const exportTab = () => {
     if (!entry) return;
-    const text = `${entry.title || 'Untitled entry'}\n\n${stripHtml(entry.content)}`;
+    const text = `${entry.title || 'Untitled tab'}\n\n${stripHtml(entry.content)}`;
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${(entry.title || 'entry').replace(/[^\w.-]+/g, '_')}.txt`;
+    a.download = `${(entry.title || 'tab').replace(/[^\w.-]+/g, '_')}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Entry exported');
+    toast.success('Tab exported');
   };
 
-  const reopenPastEntry = (past: Entry) => {
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+  const reopenPastTab = (past: Entry) => {
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
     flushDraft();
     const reopened = localDb.reopenEntry(past.id);
     if (!reopened) return;
+    pendingPatchRef.current = {};
     setViewingEntry(null);
     setEntry(reopened);
-    toast.message('Entry reopened for editing');
+    toast.message('Tab opened for editing');
   };
 
   const commitNotebookTitle = () => {
@@ -206,7 +275,7 @@ export function Notebook({
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-background">
       <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card/70 px-4 py-3 backdrop-blur-sm sm:px-6">
-        <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Back to entries">
+        <Button variant="ghost" size="icon" onClick={handleBack} aria-label="Back to tabs">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <NotieMark size="sm" />
@@ -236,23 +305,23 @@ export function Notebook({
           </button>
         )}
         <span className="hidden text-[11px] text-muted-foreground sm:inline">
-          {draftHint === 'saving' ? 'Saving draft…' : draftHint === 'saved' ? 'Draft saved' : 'Draft'}
+          {draftHint === 'saving' ? 'Saving…' : draftHint === 'saved' ? 'Saved' : 'Autosave on'}
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={exportEntry} title="Export this entry as text">
+          <Button size="sm" variant="outline" onClick={exportTab} title="Export this page as text">
             <Download className="mr-1.5 h-3.5 w-3.5" />
             <span className="hidden sm:inline">Export</span>
           </Button>
-          <Button size="sm" onClick={handleSaveEntry} disabled={savingEntry}>
+          <Button size="sm" onClick={handleSave} title="Save this page — keep editing anytime">
             <Save className="mr-1.5 h-3.5 w-3.5" />
-            Save Entry
+            Save
           </Button>
         </div>
       </header>
 
       {previousEntry && (
         <div className="shrink-0 border-b border-border/60 bg-secondary/30 px-4 py-1.5 text-xs text-muted-foreground sm:px-6">
-          Previous entry:{' '}
+          Previous tab:{' '}
           <button
             type="button"
             onClick={() => setViewingEntry(previousEntry)}
@@ -270,7 +339,7 @@ export function Notebook({
             <Input
               value={entry.title}
               onChange={(e) => scheduleDraft({ title: e.target.value })}
-              placeholder="Entry title"
+              placeholder="Tab title — a full page of ideas, plans, script…"
               className="mb-3 h-10 border-none bg-transparent px-1 font-display text-xl font-semibold shadow-none focus-visible:ring-0"
             />
             <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card/50 px-3 py-3 sm:px-4">
@@ -285,12 +354,11 @@ export function Notebook({
               />
             </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Draft autosaves while you write. Use Save Entry when this block of writing is finished —
-              that adds it to history and fills the Library book.
+              Everything you type autosaves and stays if you leave or close the app. Use Save anytime
+              to confirm. When this whole page is ready for your tab list, use Save Tab below.
             </p>
           </div>
 
-          {/* Notebook-scoped category items — shared across entries in this book only */}
           <div className="rounded-xl border border-border bg-card/70 p-4 shadow-sm">
             <CategoriesPanel
               userId={userId}
@@ -298,6 +366,22 @@ export function Notebook({
               entryId={null}
               refreshKey={categoriesRefreshKey}
             />
+          </div>
+
+          <div className="border-t border-border/70 pt-4 pb-8">
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={handleSaveTab}
+              disabled={savingTab}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              Save Tab
+            </Button>
+            <p className="mt-2 text-center text-[11px] text-muted-foreground">
+              Adds this full page to the notebook’s tab list so you can open it later. Starts a new
+              blank page here.
+            </p>
           </div>
         </div>
       </div>
@@ -340,7 +424,7 @@ export function Notebook({
               <Button variant="outline" onClick={() => setViewingEntry(null)}>
                 Close
               </Button>
-              <Button onClick={() => reopenPastEntry(viewingEntry)}>Reopen Entry</Button>
+              <Button onClick={() => reopenPastTab(viewingEntry)}>Open tab</Button>
             </div>
           )}
         </DialogContent>

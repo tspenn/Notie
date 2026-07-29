@@ -73,19 +73,19 @@ export function EntryList({
           <h2 className="truncate font-display text-2xl font-semibold text-foreground">
             {notebook.title}
           </h2>
-          <p className="text-sm text-muted-foreground">Saved entries</p>
+          <p className="text-sm text-muted-foreground">Tabs</p>
         </div>
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-        {/* Past Entries list */}
+        {/* Saved tabs — full pages finished with Save Tab */}
         <div className="min-w-0 flex-1 space-y-3">
           {entries.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border py-14 text-center">
               <BookOpen className="mx-auto h-8 w-8 text-muted-foreground/50" />
-              <p className="mt-3 font-display text-lg text-foreground">No saved entries yet</p>
+              <p className="mt-3 font-display text-lg text-foreground">No tabs yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Open the notebook to write, then Save Entry when a chapter is finished.
+                Open the notebook to write a full page, then Save Tab when it belongs in this list.
               </p>
             </div>
           ) : (
@@ -154,7 +154,7 @@ export function EntryList({
           />
 
           <Button className="mt-auto" onClick={onOpenNotebook}>
-            Open notebook
+            Continue writing
           </Button>
         </aside>
       </div>
