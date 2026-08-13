@@ -210,12 +210,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const localId = localDb.getProfile()?.id ?? null;
     if (localId) priorLocalIdRef.current = localId;
+    // Must be on the shared Supabase Auth allowlist (Site URL + Redirect URLs).
+    // Use the Notie origin so confirm links return here, not Friday Canvas.
+    const redirectTo = `${(APP_URL || window.location.origin).replace(/\/$/, '')}/auth/confirm`;
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${APP_URL}/auth/confirm`,
-        data: displayName ? { display_name: displayName } : undefined,
+        emailRedirectTo: redirectTo,
+        data: displayName ? { display_name: displayName, app: 'notie' } : { app: 'notie' },
       },
     });
     if (error) {

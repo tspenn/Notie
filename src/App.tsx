@@ -91,12 +91,50 @@ function CheckoutReturnHandler() {
   return null;
 }
 
+function AuthConfirmPage() {
+  const { mode, loading } = useAuth();
+
+  useEffect(() => {
+    // Supabase puts tokens in the URL hash; detectSessionInUrl picks them up.
+    // After a moment, land on the app root (Notie), not Friday Canvas.
+    const t = window.setTimeout(() => {
+      if (window.location.pathname === '/auth/confirm') {
+        window.history.replaceState({}, '', '/');
+      }
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && mode) {
+      toast.success('Email confirmed — welcome to Notie');
+    }
+  }, [loading, mode]);
+
+  return (
+    <div className="flex min-h-dvh items-center justify-center">
+      <div className="flex flex-col items-center gap-3 px-6 text-center">
+        <NotieMark size="lg" alt="Notie" />
+        <p className="font-display text-xl text-foreground">Confirming your Notie account…</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          Hang on a second. If nothing happens, open{' '}
+          <a href="https://my-notie.com" className="text-moss underline">
+            my-notie.com
+          </a>{' '}
+          and sign in.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AppContent() {
   const { mode, loading } = useAuth();
   const path = window.location.pathname;
 
   if (path === '/privacy') return <PrivacyPage />;
   if (path === '/terms') return <TermsPage />;
+  if (path === '/auth/confirm') return <AuthConfirmPage />;
 
   if (loading) {
     return (
