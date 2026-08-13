@@ -44,6 +44,86 @@ function tierKeyToPlan(key: unknown, tierName: string | null | undefined): PlanK
   return null;
 }
 
+const TRIAL_DAYS = 30;
+
+/**
+ * Ensure a Notie-scoped trial row exists (app_key = notie) with user_email filled.
+ * Shared Auth means Friday Canvas may also create a friday_canvas trial if the confirm
+ * link opens Canvas — that is separate and does not mean the user signed up for Canvas.
+ */
+export async function ensureNotieTrialSubscription(opts: {
+  userId: string;
+  email?: string | null;
+}): Promise<void> {
+  if (!isSupabaseConfigured) return;
+
+  const { data: existing } = await supabase
+    .from('user_subscriptions')
+    .select('id, status, user_email, trial_ends_at')
+    .eq('user_id', opts.userId)
+    .eq('app_key', APP_KEY)
+    .maybeSingle();
+
+  const email = opts.email?.trim() || null;
+
+  // Paid Notie rows — only backfill email if missing.
+  if (
+    existing &&
+    (existing.status === 'active' || existing.status === 'trialing')
+  ) {
+    if (email && !existing.user_email) {
+      await supabase
+        .from('user_subscriptions')
+        .update({ user_email: email, updated_at: new Date().toISOString() })
+        .eq('id', existing.id);
+    }
+    return;
+  }
+
+  const { data: syncTier } = await supabase
+    .from('subscription_tiers')
+    .select('id')
+    .eq('app_key', APP_KEY)
+    .eq('name', 'Cloud Sync')
+    .maybeSingle();
+
+  const now = new Date();
+  const trialEnd = new Date(now.getTime() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+  const payload = {
+    user_id: opts.userId,
+    app_key: APP_KEY,
+    status: 'trial',
+    plan_name: 'trial',
+    billing_cycle: 'monthly',
+    tier_id: syncTier?.id ?? null,
+    user_email: email,
+    current_period_start: now.toISOString(),
+    current_period_end: trialEnd.toISOString(),
+    trial_ends_at: trialEnd.toISOString(),
+    expires_at: trialEnd.toISOString(),
+    updated_at: now.toISOString(),
+  };
+
+  if (existing?.id) {
+    await supabase
+      .from('user_subscriptions')
+      .update({
+        ...payload,
+        // Keep original trial end if already set.
+        trial_ends_at: existing.trial_ends_at || payload.trial_ends_at,
+        current_period_end: existing.trial_ends_at || payload.current_period_end,
+        expires_at: existing.trial_ends_at || payload.expires_at,
+        user_email: email || existing.user_email,
+      })
+      .eq('id', existing.id);
+    return;
+  }
+
+  await supabase.from('user_subscriptions').upsert(payload, {
+    onConflict: 'user_id,app_key',
+  });
+}
+
 /** Read active Notie subscription for a signed-in user. */
 export async function fetchNotieSubscription(userId: string): Promise<ResolvedSubscription | null> {
   if (!isSupabaseConfigured) return null;
@@ -116,6 +196,15 @@ export async function resolveEffectivePlan(opts: {
     // (After real Download checkout, webhook / applyCheckoutSuccess sets one_device.)
     localDb.ensureProfileForCloudUser(opts.cloudUserId, 'trial');
     localDb.setPlan('trial');
+    try {
+      const { data } = await supabase.auth.getUser();
+      await ensureNotieTrialSubscription({
+        userId: opts.cloudUserId,
+        email: data.user?.email ?? null,
+      });
+    } catch {
+      /* best-effort cloud trial row */
+    }
     return 'trial';
   }
 
