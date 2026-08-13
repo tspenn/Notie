@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Mail } from 'lucide-react';
+import { Eye, EyeOff, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,22 +17,26 @@ import {
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
-  initialMode?: 'signin' | 'signup';
+  initialMode?: 'signin' | 'signup' | 'forgot';
 }
 
 export function AuthModal({ open, onClose, initialMode = 'signin' }: AuthModalProps) {
-  const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
+  const { signIn, signUp, requestPasswordReset } = useAuth();
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [checkEmailFor, setCheckEmailFor] = useState<string | null>(null);
+  const [resetSentTo, setResetSentTo] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
       setCheckEmailFor(null);
+      setResetSentTo(null);
       setBusy(false);
+      setShowPassword(false);
       return;
     }
     setMode(initialMode);
@@ -42,14 +46,17 @@ export function AuthModal({ open, onClose, initialMode = 'signin' }: AuthModalPr
     e.preventDefault();
     setBusy(true);
     try {
-      if (mode === 'signin') {
+      if (mode === 'forgot') {
+        await requestPasswordReset(email.trim());
+        setResetSentTo(email.trim());
+        toast.message('Check your email for a reset link.');
+      } else if (mode === 'signin') {
         await signIn(email.trim(), password);
         toast.success('Welcome back');
         onClose();
       } else {
         const result = await signUp(email.trim(), password, displayName.trim() || undefined);
         if (result.requiresConfirmation) {
-          // Keep the dialog open with a clear message (toast alone is easy to miss).
           setCheckEmailFor(email.trim());
         } else {
           toast.success('Welcome to Notie');
@@ -69,10 +76,40 @@ export function AuthModal({ open, onClose, initialMode = 'signin' }: AuthModalPr
     }
   };
 
+  const title =
+    mode === 'forgot'
+      ? 'Reset password'
+      : mode === 'signin'
+        ? 'Sign in'
+        : 'Create your account';
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
-        {checkEmailFor ? (
+        {resetSentTo ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 font-display">
+                <Mail className="h-5 w-5 text-moss" />
+                Check your email
+              </DialogTitle>
+              <DialogDescription className="text-left leading-relaxed">
+                If an account exists for{' '}
+                <span className="font-medium text-foreground">{resetSentTo}</span>, we sent a
+                password reset link. Open it on this device, then choose a new password.
+              </DialogDescription>
+            </DialogHeader>
+            <Button
+              className="w-full"
+              onClick={() => {
+                setResetSentTo(null);
+                setMode('signin');
+              }}
+            >
+              Back to sign in
+            </Button>
+          </>
+        ) : checkEmailFor ? (
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 font-display">
@@ -102,11 +139,13 @@ export function AuthModal({ open, onClose, initialMode = 'signin' }: AuthModalPr
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>{mode === 'signin' ? 'Sign in' : 'Create your account'}</DialogTitle>
+              <DialogTitle>{title}</DialogTitle>
               <DialogDescription>
-                {mode === 'signup'
-                  ? 'Create a free account to start your 30-day trial — Sync across devices included.'
-                  : 'Sign in to open your library on this device.'}
+                {mode === 'forgot'
+                  ? 'We’ll email you a link to choose a new password.'
+                  : mode === 'signup'
+                    ? 'Create a free account to start your 30-day trial — Sync across devices included.'
+                    : 'Sign in to open your library on this device.'}
               </DialogDescription>
             </DialogHeader>
 
@@ -135,26 +174,67 @@ export function AuthModal({ open, onClose, initialMode = 'signin' }: AuthModalPr
                   autoComplete="email"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  minLength={6}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                />
-              </div>
+              {mode !== 'forgot' && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="password">Password</Label>
+                    {mode === 'signin' && (
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-moss underline-offset-2 hover:underline"
+                        onClick={() => setMode('forgot')}
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <Button type="submit" className="w-full" disabled={busy}>
-                {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+                {busy
+                  ? 'Please wait…'
+                  : mode === 'forgot'
+                    ? 'Send reset link'
+                    : mode === 'signin'
+                      ? 'Sign in'
+                      : 'Create account'}
               </Button>
             </form>
 
             <p className="mt-4 text-center text-sm text-muted-foreground">
-              {mode === 'signin' ? (
+              {mode === 'forgot' ? (
+                <>
+                  Remembered it?{' '}
+                  <button
+                    type="button"
+                    className="font-medium text-primary underline-offset-2 hover:underline"
+                    onClick={() => setMode('signin')}
+                  >
+                    Sign in
+                  </button>
+                </>
+              ) : mode === 'signin' ? (
                 <>
                   New here?{' '}
                   <button

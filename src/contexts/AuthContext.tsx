@@ -24,6 +24,11 @@ interface AuthContextType {
     password: string,
     displayName?: string,
   ) => Promise<{ requiresConfirmation: boolean }>;
+  /** Send a password-reset email (Supabase Auth). */
+  requestPasswordReset: (email: string) => Promise<void>;
+  /** Set a new password after opening the reset link. */
+  updatePassword: (password: string) => Promise<void>;
+  clearPasswordRecovery: () => void;
   signOut: () => Promise<void>;
   /** Local / Download session without cloud Sync. */
   startLocal: () => void;
@@ -202,6 +207,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error;
   };
 
+  const requestPasswordReset = async (email: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error(
+        'Notie is not connected to the cloud yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Vercel, then redeploy.',
+      );
+    }
+    const redirectTo = `${(APP_URL || window.location.origin).replace(/\/$/, '')}/auth/confirm`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo });
+    if (error) throw error;
+  };
+
+  const updatePassword = async (password: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Notie is not connected to the cloud yet.');
+    }
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+    recoveryRef.current = false;
+    setIsPasswordRecovery(false);
+  };
+
+  const clearPasswordRecovery = () => {
+    recoveryRef.current = false;
+    setIsPasswordRecovery(false);
+  };
+
   const signUp = async (email: string, password: string, displayName?: string) => {
     if (!isSupabaseConfigured) {
       throw new Error(
@@ -293,6 +324,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isPasswordRecovery,
         signIn,
         signUp,
+        requestPasswordReset,
+        updatePassword,
+        clearPasswordRecovery,
         signOut,
         startLocal,
         refreshPlan,
