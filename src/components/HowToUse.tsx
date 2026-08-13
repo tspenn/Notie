@@ -137,7 +137,7 @@ const SECTIONS: Section[] = [
       },
       {
         heading: 'Google Calendar — secret address',
-        body: 'calendar.google.com → calendar ⋮ menu → Settings and sharing → Integrate calendar → copy “Secret address in iCal format”. That is the URL to paste into Notie.',
+        body: 'calendar.google.com → Settings gear (near Day/Week/Month) → under “Settings for my calendars” click the calendar you want → scroll to Integrate calendar → copy “Secret address in iCal format” (not the public HTML link). Paste that URL into Notie and Sync now.',
       },
       {
         heading: 'Apple & Outlook',

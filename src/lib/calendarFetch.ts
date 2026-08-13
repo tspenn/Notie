@@ -13,6 +13,7 @@ type FetchIcsResult =
 function edgeHeaders(token: string, trialUserId?: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
+    apikey: supabaseKey,
     'x-app-key': APP_KEY,
   };
   if (trialUserId) headers['X-Notie-Trial-Id'] = trialUserId;
@@ -26,6 +27,18 @@ async function parseIcsResponse(res: Response): Promise<FetchIcsResult> {
   }
   if (!json.ics) return { ok: false, error: 'Empty calendar feed' };
   return { ok: true, ics: json.ics };
+}
+
+async function callEdge(url: string, headers: Record<string, string>): Promise<FetchIcsResult> {
+  try {
+    const res = await fetch(url, { headers });
+    return await parseIcsResponse(res);
+  } catch {
+    return {
+      ok: false,
+      error: 'Could not reach the calendar sync service. Check your connection and try again.',
+    };
+  }
 }
 
 /** Lightweight auth so free-trial users can sync via the shared fetch-ics proxy. */
@@ -53,7 +66,7 @@ export async function resolveCalendarAuthUser() {
 
 /**
  * Fetch ICS text server-side when possible (CORS-safe).
- * Trial/local users: anonymous session → fetch-ics-trial (trusted hosts only) → direct fetch.
+ * Uses fetch-ics (signed-in), then fetch-ics-trial (Google/Apple/Outlook), then direct.
  */
 export async function fetchIcsText(
   url: string,
@@ -67,21 +80,27 @@ export async function fetchIcsText(
   }
 
   if (accessToken && supabaseUrl) {
-    const res = await fetch(
+    const primary = await callEdge(
       `${supabaseUrl}/functions/v1/fetch-ics?url=${encodeURIComponent(url)}`,
-      { headers: edgeHeaders(accessToken) },
+      edgeHeaders(accessToken),
     );
-    const primary = await parseIcsResponse(res);
-    if (primary.ok || primary.status !== 401) return primary;
+    if (primary.ok) return primary;
+    // Fall through on 401/network/proxy errors — trial proxy covers Google/Apple/Outlook.
+    if (primary.status && primary.status !== 401 && primary.status < 500) {
+      // Keep 403 (allowlist) and 4xx validation errors visible.
+      if (primary.status === 403 || primary.status === 422 || primary.status === 413) {
+        return primary;
+      }
+    }
   }
 
-  if (trialUserId && supabaseUrl && supabaseKey) {
-    const res = await fetch(
+  if (supabaseUrl && supabaseKey) {
+    const trial = await callEdge(
       `${supabaseUrl}/functions/v1/fetch-ics-trial?url=${encodeURIComponent(url)}`,
-      { headers: edgeHeaders(supabaseKey, trialUserId) },
+      edgeHeaders(supabaseKey, trialUserId || 'notie-browser'),
     );
-    const trial = await parseIcsResponse(res);
-    if (trial.ok || trial.status !== 404) return trial;
+    if (trial.ok) return trial;
+    if (trial.status && trial.status !== 404) return trial;
   }
 
   try {
@@ -94,7 +113,7 @@ export async function fetchIcsText(
     return {
       ok: false,
       error:
-        'Could not reach that calendar from this browser. Google, Apple, and Outlook links usually work during your free trial.',
+        'Could not reach that calendar from this browser. Google, Apple, and Outlook links usually work during your free trial — try Sync again in a moment.',
     };
   }
 }

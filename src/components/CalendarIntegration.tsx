@@ -368,14 +368,19 @@ function IcsCalendarCard({ userId }: { userId: string }) {
                 on a computer
               </li>
               <li>
-                Find your calendar in the left sidebar → click the <span className="text-foreground">⋮</span>{' '}
-                menu → <span className="text-foreground">Settings and sharing</span>
+                Click the <span className="text-foreground">Settings</span> gear icon in the top bar
+                (near Day / Week / Month)
               </li>
               <li>
-                Click <span className="text-foreground">Integrate calendar</span>
+                Under <span className="text-foreground">Settings for my calendars</span>, click the
+                calendar you want (for example your main calendar)
               </li>
               <li>
-                Copy the <span className="text-foreground">Secret address in iCal format</span>
+                Scroll to <span className="text-foreground">Integrate calendar</span>
+              </li>
+              <li>
+                Copy <span className="text-foreground">Secret address in iCal format</span> (not the
+                public HTML link)
               </li>
               <li>Paste that URL above and tap Sync now</li>
             </ol>
