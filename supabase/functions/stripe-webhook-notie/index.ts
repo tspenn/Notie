@@ -58,6 +58,9 @@ async function activateNotiePlan(opts: {
         ? 'cloud_sync'
         : tier.name;
 
+  const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(opts.userId);
+  const userEmail = authUser.user?.email ?? null;
+
   const { error } = await supabaseAdmin.from('user_subscriptions').upsert(
     {
       user_id: opts.userId,
@@ -72,6 +75,7 @@ async function activateNotiePlan(opts: {
       stripe_customer_id: opts.stripeCustomerId,
       stripe_subscription_id: opts.stripeSubscriptionId,
       stripe_price_id: opts.stripePriceId,
+      user_email: userEmail,
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'user_id,app_key' },
