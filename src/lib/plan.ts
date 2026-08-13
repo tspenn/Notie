@@ -111,9 +111,15 @@ export async function resolveEffectivePlan(opts: {
       return sub.plan;
     }
 
-    // No paid Notie subscription — keep Download if already unlocked locally, else trial.
-    if (local === 'one_device') return 'one_device';
+    // No paid Notie subscription for this cloud user → trial.
+    // (Download/Sync only stick when Stripe says so, or same cloud user already unlocked Download locally after checkout.)
     localDb.ensureProfileForCloudUser(opts.cloudUserId, 'trial');
+    const profile = localDb.getProfile();
+    if (profile?.id === opts.cloudUserId && profile.plan === 'one_device') {
+      // Webhook lag after a Download purchase on this same account.
+      return 'one_device';
+    }
+    if (profile?.plan !== 'trial') localDb.setPlan('trial');
     return 'trial';
   }
 

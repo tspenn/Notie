@@ -214,10 +214,20 @@ export const localDb = {
       if (store.profile.id !== cloudUserId) {
         const prior = store.profile.id;
         store.profile.id = cloudUserId;
+        // New cloud account — do not keep a prior browser's Download/Sync flag.
+        store.profile.plan = plan;
+        store.profile.trialStartedAt =
+          plan === 'trial' ? store.profile.trialStartedAt || nowIso() : store.profile.trialStartedAt;
+        if (plan === 'trial' && !store.profile.trialStartedAt) {
+          store.profile.trialStartedAt = nowIso();
+        }
         write(store);
         this.reassignUserId(prior, cloudUserId);
-      }
-      if (plan === 'trial' && store.profile.plan !== 'one_device' && store.profile.plan !== 'cloud_sync') {
+      } else if (
+        plan === 'trial' &&
+        store.profile.plan !== 'one_device' &&
+        store.profile.plan !== 'cloud_sync'
+      ) {
         this.setPlan('trial');
       }
       return this.getProfile()!;

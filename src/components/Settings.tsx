@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Archive,
   Bell,
@@ -70,6 +70,15 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
     setHowToSection(section);
     setHowToOpen(true);
   };
+
+  useEffect(() => {
+    if (!open) return;
+    setPlanBusy(false);
+    setSyncBusy(false);
+    if (mode === 'cloud') {
+      void refreshPlan().catch(() => undefined);
+    }
+  }, [open, mode, refreshPlan]);
 
   return (
     <>
@@ -190,6 +199,8 @@ export function Settings({ open, onClose, onOpenArchive, onOpenCalendar }: Setti
                         });
                       } catch (e) {
                         toast.error(e instanceof Error ? e.message : 'Checkout failed');
+                      } finally {
+                        // Checkout redirects away on success; if it doesn't, unlock buttons again.
                         setPlanBusy(false);
                       }
                     }}
