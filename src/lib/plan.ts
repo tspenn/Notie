@@ -111,15 +111,11 @@ export async function resolveEffectivePlan(opts: {
       return sub.plan;
     }
 
-    // No paid Notie subscription for this cloud user → trial.
-    // (Download/Sync only stick when Stripe says so, or same cloud user already unlocked Download locally after checkout.)
+    // No paid Notie subscription for this cloud user → free trial.
+    // Do not keep a stale local "Download" flag — that trapped signed-in trial users.
+    // (After real Download checkout, webhook / applyCheckoutSuccess sets one_device.)
     localDb.ensureProfileForCloudUser(opts.cloudUserId, 'trial');
-    const profile = localDb.getProfile();
-    if (profile?.id === opts.cloudUserId && profile.plan === 'one_device') {
-      // Webhook lag after a Download purchase on this same account.
-      return 'one_device';
-    }
-    if (profile?.plan !== 'trial') localDb.setPlan('trial');
+    localDb.setPlan('trial');
     return 'trial';
   }
 
@@ -136,9 +132,16 @@ export async function applyCheckoutSuccess(cloudUserId: string): Promise<PlanKey
     const sub = await fetchNotieSubscription(cloudUserId);
     if (sub && sub.plan !== 'trial' && (sub.status === 'active' || sub.status === 'trialing')) {
       localDb.setPlan(sub.plan);
+      sessionStorage.removeItem('notie_pending_plan');
       return sub.plan;
     }
     await new Promise((r) => setTimeout(r, 800));
+  }
+  const pending = sessionStorage.getItem('notie_pending_plan');
+  if (pending === 'one_device' || pending === 'cloud_sync') {
+    localDb.setPlan(pending);
+    sessionStorage.removeItem('notie_pending_plan');
+    return pending;
   }
   return null;
 }

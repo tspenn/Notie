@@ -41,6 +41,12 @@ export async function startNotieCheckout(opts: {
     throw new Error(data.error || 'Checkout failed');
   }
   if (!data.url) throw new Error('No checkout URL returned.');
+  // Hint for brief webhook lag after return (cleared when plan resolves).
+  if (opts.billingCycle === 'one_time') {
+    sessionStorage.setItem('notie_pending_plan', 'one_device');
+  } else {
+    sessionStorage.setItem('notie_pending_plan', 'cloud_sync');
+  }
   window.location.assign(data.url);
 }
 
