@@ -249,7 +249,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
       options: {
         emailRedirectTo: redirectTo,
-        data: displayName ? { display_name: displayName, app: 'notie' } : { app: 'notie' },
+        data: {
+          signup_app: 'notie',
+          app: 'notie',
+          ...(displayName ? { display_name: displayName } : {}),
+        },
       },
     });
     if (error) {
