@@ -1,6 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, type ReactNode } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
 import Underline from '@tiptap/extension-underline';
 import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
@@ -8,11 +10,14 @@ import Image from '@tiptap/extension-image';
 import TextAlign from '@tiptap/extension-text-align';
 import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, Undo2, Redo2 } from 'lucide-react';
 
+import { dictationToHtml } from '@/lib/dictationPostProcess';
 import { cn } from '@/lib/utils';
 
 export interface RichEditorHandle {
   focus: () => void;
   getHtml: () => string;
+  /** Append polished dictation at document end (not caret). */
+  appendText: (text: string) => void;
 }
 
 interface RichEditorProps {
@@ -23,6 +28,8 @@ interface RichEditorProps {
   className?: string;
   /** Renders on the right of the formatting toolbar (Inspiration + lamp). */
   toolbarTrailing?: ReactNode;
+  /** Extra controls after format buttons (e.g. Voice). */
+  toolbarExtra?: ReactNode;
   /** Fired after mouse/touch selection ends with meaningful text. */
   onTextSelected?: (text: string) => void;
 }
@@ -44,18 +51,28 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
       placeholder = 'Begin writing…',
       className,
       toolbarTrailing,
+      toolbarExtra,
       onTextSelected,
     },
     ref,
   ) => {
     const lastHtmlRef = useRef('');
     const isExternalUpdateRef = useRef(false);
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
     const onTextSelectedRef = useRef(onTextSelected);
     onTextSelectedRef.current = onTextSelected;
 
     const editor = useEditor({
       extensions: [
-        StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+        StarterKit.configure({
+          heading: { levels: [1, 2, 3] },
+          // Disable auto “1. ” / “- ” → list (typed lines were vanishing). Toolbar toggles still work.
+          bulletList: false,
+          orderedList: false,
+        }),
+        BulletList.extend({ addInputRules: () => [] }),
+        OrderedList.extend({ addInputRules: () => [] }),
         Underline,
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
         Link.configure({ openOnClick: false, autolink: true }),
@@ -73,7 +90,7 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
         if (isExternalUpdateRef.current) return;
         const html = editor.getHTML();
         lastHtmlRef.current = html;
-        onChange(html);
+        onChangeRef.current(html);
       },
     });
 
@@ -119,6 +136,15 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
       () => ({
         focus: () => editor?.commands.focus(),
         getHtml: () => editor?.getHTML() ?? '',
+        appendText: (text: string) => {
+          if (!editor) return;
+          const html = dictationToHtml(text, { leadingSpace: true });
+          if (!html) return;
+          editor.chain().focus('end').insertContent(html).run();
+          const next = editor.getHTML();
+          lastHtmlRef.current = next;
+          onChangeRef.current(next);
+        },
       }),
       [editor],
     );
@@ -196,6 +222,12 @@ export const RichEditor = forwardRef<RichEditorHandle, RichEditorProps>(
               >
                 <Redo2 className="h-3.5 w-3.5" />
               </button>
+              {toolbarExtra ? (
+                <>
+                  <div className="mx-1 h-4 w-px bg-border" />
+                  {toolbarExtra}
+                </>
+              ) : null}
             </div>
             {toolbarTrailing ? (
               <div className="flex shrink-0 items-center gap-2 border-l border-border pl-2">

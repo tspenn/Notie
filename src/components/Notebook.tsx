@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Download, Save, X } from 'lucide-react';
+import { ArrowLeft, Download, Mic, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useActivityTimer } from '@/hooks/useActivityTimer';
+import { useInlineDictation } from '@/hooks/useInlineDictation';
 import { localDb } from '@/lib/localDb';
 import type { Entry, NotebookMeta } from '@/lib/types';
 import { formatShortDate, stripHtml } from '@/lib/utils';
@@ -11,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { RichEditor } from '@/components/RichEditor';
+import { RichEditor, type RichEditorHandle } from '@/components/RichEditor';
 import { CategoriesPanel } from '@/components/CategoriesPanel';
 import { SelectionActionDialog } from '@/components/SelectionActionDialog';
 import { NotieMark } from '@/components/NotieMark';
@@ -55,9 +56,27 @@ export function Notebook({
 
   const saveTimer = useRef<number | null>(null);
   const entryRef = useRef<Entry | null>(null);
+  const editorRef = useRef<RichEditorHandle | null>(null);
   /** Accumulates edits synchronously so Back/hide never loses keystrokes waiting on React or the debounce. */
   const pendingPatchRef = useRef<Partial<Pick<Entry, 'title' | 'content' | 'inspiration'>>>({});
   const loadingRef = useRef(true);
+
+  const {
+    listening: voiceListening,
+    status: voiceStatus,
+    startOrFinish: startOrFinishVoice,
+    cancel: cancelVoice,
+  } = useInlineDictation({
+    owner: 'notebook-voice',
+    enabled: Boolean(entry && !entry.isArchived),
+    onTranscript: (text) => {
+      editorRef.current?.appendText(text);
+    },
+  });
+
+  useEffect(() => {
+    return () => cancelVoice();
+  }, [cancelVoice]);
 
   useEffect(() => {
     entryRef.current = entry;
@@ -160,6 +179,7 @@ export function Notebook({
   });
 
   const handleBack = () => {
+    cancelVoice();
     if (saveTimer.current) {
       window.clearTimeout(saveTimer.current);
       saveTimer.current = null;
@@ -344,6 +364,7 @@ export function Notebook({
             />
             <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card/50 px-3 py-3 sm:px-4">
               <RichEditor
+                ref={editorRef}
                 className="flex min-h-[min(52vh,30rem)] flex-1 flex-col"
                 content={entry.content}
                 onChange={(html) => scheduleDraft({ content: html })}
@@ -351,12 +372,32 @@ export function Notebook({
                   setSelectedText(text);
                   setSelectionOpen(true);
                 }}
+                toolbarExtra={
+                  <button
+                    type="button"
+                    onClick={startOrFinishVoice}
+                    disabled={!entry || entry.isArchived}
+                    title={voiceListening ? 'Stop dictation' : 'Voice dictation'}
+                    className={`inline-flex h-7 items-center gap-1 rounded px-1.5 text-xs transition-colors ${
+                      voiceListening
+                        ? 'bg-moss/20 text-moss'
+                        : 'text-foreground/55 hover:bg-moss/10 hover:text-foreground'
+                    } disabled:opacity-30`}
+                  >
+                    <Mic className={`h-3.5 w-3.5 ${voiceListening ? 'animate-pulse' : ''}`} />
+                    {voiceListening ? 'Stop' : 'Voice'}
+                  </button>
+                }
               />
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Everything you type autosaves and stays if you leave or close the app. Use Save anytime
-              to confirm. When this whole page is ready for your tab list, use Save Tab below.
-            </p>
+            {voiceStatus ? (
+              <p className="mt-2 text-[11px] text-moss">{voiceStatus}</p>
+            ) : (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Everything you type autosaves and stays if you leave or close the app. Use Save anytime
+                to confirm. When this whole page is ready for your tab list, use Save Tab below.
+              </p>
+            )}
           </div>
 
           <div className="rounded-xl border border-border bg-card/70 p-4 shadow-sm">

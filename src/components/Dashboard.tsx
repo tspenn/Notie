@@ -31,6 +31,7 @@ import { Settings } from '@/components/Settings';
 import { ArchiveView } from '@/components/ArchiveView';
 import { NotieMark } from '@/components/NotieMark';
 import { OpenSessionStack } from '@/components/OpenSessionStack';
+import { QuickDictation } from '@/components/QuickDictation';
 import { brandHeaderClass } from '@/lib/brand';
 
 type MainTab = 'library' | 'calendar' | 'notes';
@@ -322,7 +323,13 @@ export function Dashboard() {
         />
       )}
 
-      <div className="fixed bottom-5 right-4 z-[60] sm:bottom-6 sm:right-6">
+      <div className="fixed bottom-5 right-4 z-[60] flex flex-col items-end gap-2 sm:bottom-6 sm:right-6">
+        {!openNotebookId ? (
+          <QuickDictation
+            userId={userId}
+            onFiled={(notebookId) => openWritingSpace(notebookId)}
+          />
+        ) : null}
         <OpenSessionStack
           doors={sessionDoors}
           onOpen={(door) => {
