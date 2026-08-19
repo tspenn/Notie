@@ -29,10 +29,9 @@ import { Notebook } from '@/components/Notebook';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { Settings } from '@/components/Settings';
 import { ArchiveView } from '@/components/ArchiveView';
-import { NotieMark } from '@/components/NotieMark';
 import { OpenSessionStack } from '@/components/OpenSessionStack';
 import { QuickDictation } from '@/components/QuickDictation';
-import { brandHeaderClass } from '@/lib/brand';
+import { brandHeaderClass, NOTIE_LOGO_LOCKUP } from '@/lib/brand';
 
 type MainTab = 'library' | 'calendar' | 'notes';
 
@@ -205,11 +204,13 @@ export function Dashboard() {
     <div className="flex min-h-dvh flex-col">
       <header className={brandHeaderClass}>
         <div className="mx-auto flex min-h-16 max-w-6xl items-center gap-2 px-4 py-2 sm:px-6 md:min-h-[125px] md:gap-3 md:py-2">
-          <NotieMark size="header" />
           <div className="min-w-0 flex-1">
-            <p className="notie-wordmark text-2xl leading-none text-foreground md:text-4xl">
-              Notie
-            </p>
+            <img
+              src={NOTIE_LOGO_LOCKUP}
+              alt="Notie"
+              className="h-12 w-auto max-w-[min(100%,16rem)] object-contain object-left sm:h-14 md:h-[5.75rem] md:max-w-[22rem]"
+              draggable={false}
+            />
             <p className="mt-0.5 truncate text-sm text-muted-foreground md:mt-1 md:text-base">
               {displayName}
             </p>

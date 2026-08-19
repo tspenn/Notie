@@ -5,8 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchNotieTiers, startNotieCheckout, type NotieBillingCycle } from '@/lib/checkout';
 import { Button } from '@/components/ui/button';
 import { AuthModal } from '@/components/AuthModal';
-import { NotieMark } from '@/components/NotieMark';
-import { brandHeaderSurface } from '@/lib/brand';
+import { brandHeaderSurface, NOTIE_LOGO_LOCKUP } from '@/lib/brand';
 
 type PlanKey = 'one_device' | 'cloud_sync';
 
@@ -100,9 +99,13 @@ export function LandingPage({ onSeePlans }: LandingPageProps) {
 
       <header className={`relative ${brandHeaderSurface}`}>
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
-          <div className="flex items-center gap-2">
-            <NotieMark size="md" alt="Notie" className="shadow-sm" />
-            <span className="notie-wordmark text-2xl sm:text-3xl">Notie</span>
+          <div className="flex min-w-0 items-center">
+            <img
+              src={NOTIE_LOGO_LOCKUP}
+              alt="Notie"
+              className="h-12 w-auto max-w-[min(100%,14rem)] object-contain object-left sm:h-14 sm:max-w-[18rem]"
+              draggable={false}
+            />
           </div>
         <Button
           variant="ghost"

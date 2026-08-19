@@ -1,3 +1,6 @@
+/** Horizontal pencil + Notie script lockup (replaces icon + wordmark in chrome). */
+export const NOTIE_LOGO_LOCKUP = '/notie-logo-lockup.png';
+
 /** Vintage letters + pocket watch — branding inspiration (public folder). */
 export const BRAND_HEADER_IMAGE = '/matuska-hour-s-1994980.jpg';
 
