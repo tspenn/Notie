@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Archive, CalendarDays, Library as LibraryIcon, Search, Settings2, StickyNote } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,14 @@ import {
   parseDeepLink,
   searchLink,
 } from '@/lib/deepLinks';
+import { localDb } from '@/lib/localDb';
+import {
+  addDoorSideNote,
+  archiveAllLiveDoors,
+  loadSessionDoors,
+  touchSessionDoor,
+  type SessionDoor,
+} from '@/lib/openSessionStack';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Library } from '@/components/Library';
@@ -22,9 +30,34 @@ import { GlobalSearch } from '@/components/GlobalSearch';
 import { Settings } from '@/components/Settings';
 import { ArchiveView } from '@/components/ArchiveView';
 import { NotieMark } from '@/components/NotieMark';
+import { OpenSessionStack } from '@/components/OpenSessionStack';
 import { brandHeaderClass } from '@/lib/brand';
 
 type MainTab = 'library' | 'calendar' | 'notes';
+
+function doorMeta(notebookId: string, entryId?: string | null) {
+  const notebook = localDb.getNotebook(notebookId);
+  const notebookTitle = notebook?.title || 'Notebook';
+  if (entryId) {
+    const entry = localDb.getEntry(entryId);
+    return {
+      notebookTitle,
+      entryId,
+      entryLabel: entry?.title?.trim() || 'Tab',
+    };
+  }
+  const open = localDb.getOpenEntry(notebookId);
+  return {
+    notebookTitle,
+    entryId: null as string | null,
+    entryLabel: open?.title?.trim() || 'Open draft',
+  };
+}
+
+function resolveDoorEntryId(door: SessionDoor): string | null {
+  if (door.entryId) return door.entryId;
+  return localDb.getOpenEntry(door.notebookId)?.id ?? null;
+}
 
 export function Dashboard() {
   const { userId, displayName } = useAuth();
@@ -32,12 +65,39 @@ export function Dashboard() {
   const [entryListId, setEntryListId] = useState<string | null>(null);
   const [openNotebookId, setOpenNotebookId] = useState<string | null>(null);
   const [openEntryId, setOpenEntryId] = useState<string | undefined>();
+  const [notebookMountKey, setNotebookMountKey] = useState(0);
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [sessionDoors, setSessionDoors] = useState<SessionDoor[]>([]);
 
   const bumpLibrary = () => setLibraryRefreshKey((k) => k + 1);
+
+  const refreshDoors = useCallback(() => {
+    if (!userId) return;
+    setSessionDoors(loadSessionDoors(userId));
+  }, [userId]);
+
+  useEffect(() => {
+    refreshDoors();
+  }, [refreshDoors]);
+
+  const recordVisit = useCallback(
+    (notebookId: string, entryId?: string) => {
+      if (!userId) return;
+      const meta = doorMeta(notebookId, entryId);
+      setSessionDoors(
+        touchSessionDoor(userId, {
+          notebookId,
+          notebookTitle: meta.notebookTitle,
+          entryId: meta.entryId,
+          entryLabel: meta.entryLabel,
+        }),
+      );
+    },
+    [userId],
+  );
 
   const openEntryList = (id: string) => {
     setEntryListId(id);
@@ -51,6 +111,8 @@ export function Dashboard() {
     setEntryListId(notebookId);
     setOpenNotebookId(notebookId);
     setOpenEntryId(entryId);
+    setNotebookMountKey((k) => k + 1);
+    recordVisit(notebookId, entryId);
     navigateTo(
       entryId
         ? `#/notebook/${encodeURIComponent(notebookId)}/entry/${encodeURIComponent(entryId)}`.replace(
@@ -81,11 +143,35 @@ export function Dashboard() {
         setEntryListId(route.notebookId);
         setOpenNotebookId(route.notebookId);
         setOpenEntryId(undefined);
+        setNotebookMountKey((k) => k + 1);
+        if (userId) {
+          const meta = doorMeta(route.notebookId);
+          setSessionDoors(
+            touchSessionDoor(userId, {
+              notebookId: route.notebookId,
+              notebookTitle: meta.notebookTitle,
+              entryId: null,
+              entryLabel: meta.entryLabel,
+            }),
+          );
+        }
       } else if (route.type === 'entry') {
         setTab('library');
         setEntryListId(route.notebookId);
         setOpenNotebookId(route.notebookId);
         setOpenEntryId(route.entryId);
+        setNotebookMountKey((k) => k + 1);
+        if (userId) {
+          const meta = doorMeta(route.notebookId, route.entryId);
+          setSessionDoors(
+            touchSessionDoor(userId, {
+              notebookId: route.notebookId,
+              notebookTitle: meta.notebookTitle,
+              entryId: meta.entryId,
+              entryLabel: meta.entryLabel,
+            }),
+          );
+        }
       } else {
         setTab('library');
         setEntryListId(null);
@@ -96,7 +182,21 @@ export function Dashboard() {
     apply();
     window.addEventListener('hashchange', apply);
     return () => window.removeEventListener('hashchange', apply);
-  }, []);
+  }, [userId]);
+
+  const appendJotIfPossible = (door: SessionDoor, text: string) => {
+    const note = text.trim();
+    if (!note) return;
+    const targetId = resolveDoorEntryId(door);
+    if (!targetId) return;
+    localDb.appendEntryJot(targetId, note);
+    const openMatches =
+      openNotebookId === door.notebookId &&
+      (openEntryId
+        ? openEntryId === targetId
+        : !door.entryId || door.entryId === targetId);
+    if (openMatches) setNotebookMountKey((k) => k + 1);
+  };
 
   if (!userId) return null;
 
@@ -206,6 +306,7 @@ export function Dashboard() {
 
       {openNotebookId && (
         <Notebook
+          key={`${openNotebookId}:${openEntryId ?? 'draft'}:${notebookMountKey}`}
           userId={userId}
           notebookId={openNotebookId}
           initialEntryId={openEntryId}
@@ -220,6 +321,29 @@ export function Dashboard() {
           }}
         />
       )}
+
+      <div className="fixed bottom-5 right-4 z-[60] sm:bottom-6 sm:right-6">
+        <OpenSessionStack
+          doors={sessionDoors}
+          onOpen={(door) => {
+            openWritingSpace(door.notebookId, door.entryId ?? undefined);
+          }}
+          onArchiveLive={() => {
+            setSessionDoors(archiveAllLiveDoors(userId));
+          }}
+          onSideNote={(door, text) => {
+            setSessionDoors(addDoorSideNote(userId, door, text));
+            appendJotIfPossible(door, text);
+          }}
+          onExpandNote={(door, text) => {
+            if (text.trim()) {
+              setSessionDoors(addDoorSideNote(userId, door, text));
+              appendJotIfPossible(door, text);
+            }
+            openWritingSpace(door.notebookId, door.entryId ?? undefined);
+          }}
+        />
+      </div>
 
       <GlobalSearch
         userId={userId}

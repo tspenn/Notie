@@ -641,6 +641,37 @@ export const localDb = {
     return entry;
   },
 
+  /** Append a side-note jot into entry body (open draft or saved tab). */
+  appendEntryJot(entryId: string, text: string): Entry | null {
+    const note = String(text || '').trim();
+    if (!note) return null;
+    const store = read();
+    const entry = store.entries.find((e) => e.id === entryId);
+    if (!entry) return null;
+    const time = new Date().toLocaleString(undefined, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+    const escaped = note
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+    const block = `<p><em>You · ${time}</em></p><p>${escaped}</p>`;
+    const base = (entry.content || '').trim() || '<p></p>';
+    entry.content = `${base}${block}`;
+    entry.updatedAt = nowIso();
+    write(store);
+    if (!entry.isArchived) {
+      this.writeDraft(entry.userId, entry.notebookId, entry.id, {
+        title: entry.title,
+        content: entry.content,
+        inspiration: entry.inspiration,
+      });
+    }
+    return entry;
+  },
+
   listSavedItems(notebookId: string): SavedItem[] {
     return read()
       .savedItems.filter((s) => s.notebookId === notebookId)
