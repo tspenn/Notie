@@ -45,8 +45,8 @@ const SECTIONS: Section[] = [
         body: 'Each binding on the shelf is a writing project, with its name on the spine. Growth shows as the binding gets taller. Tap a book to open its Tabs list.',
       },
       {
-        heading: 'Previous tab',
-        body: 'Above each book you may see “Previous tab: [title] — [date]” so you can see the last finished page at a glance.',
+        heading: 'Last activity date',
+        body: 'A short date above a book marks recent activity. Open the book for titles and details, or use Places visited for a quick where/when overview.',
       },
     ],
   },

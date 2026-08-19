@@ -41,11 +41,6 @@ function BookBinding({ data, onOpen }: { data: NotebookShelfData; onOpen: () => 
     <div className="animate-shelf-in flex flex-col items-center">
       {data.previousEntry && (
         <p className="mb-2 max-w-[5.5rem] px-0.5 text-center text-xs leading-snug text-muted-foreground">
-          Previous tab:{' '}
-          <span className="font-medium text-foreground">
-            {data.previousEntry.title || 'Untitled'}
-          </span>
-          <br />
           {formatShortDate(data.previousEntry.updatedAt)}
         </p>
       )}
